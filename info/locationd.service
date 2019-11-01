@@ -1,0 +1,16 @@
+[Unit]
+# Human readable name of the unit
+Description=Location and orientation awareness service
+
+[Service]
+# Ensure the logging putput is flushed
+Environment=PYTHONUNBUFFERED=1
+
+# Command to execute when the service is started
+ExecStart=/usr/bin/python3 /usr/local/lib/locationd/locationd.py
+
+# Auto restart on crash
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

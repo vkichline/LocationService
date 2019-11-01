@@ -1,0 +1,24 @@
+Service control file:
+/etc/systemd/system/locationd.service
+
+Service script:
+/usr/local/lib/locationd/locationd.py
+
+Cache file:
+/var/cache/locationd/locationd.cache
+
+IPC Socket:
+127.0.0.1:9999
+
+Unit control:
+systemctl list-unit-files | grep locationd
+sudo systemctl daemon-reload
+sudo systemctl enable locationd
+sudo systemctl disable locationd
+sudo systemctl  start locationd
+sudo systemctl stop locationd
+sudo systemctl restart locationd
+sudo systemctl  status locationd
+
+Log:
+journalctl --unit locationd
