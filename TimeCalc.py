@@ -86,7 +86,7 @@ class TimeCalc:
         EoT  = self.getEoT()
         TC   = 4 * (self.lon - LSTM) + EoT
         LST  = LT + timedelta(minutes=TC)
-        if LT.tzinfo._dst.seconds != 0:
+        if LT.dst().seconds != 0:
             LST -= timedelta(hours=1)
         return LST
     def decimalHoursToHMS(self, h):
