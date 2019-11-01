@@ -18,9 +18,12 @@
 # Names of the GpsState properties:
 #    mode(int), time(str), lat(float deg), lon(float deg), alt(int M), speed(float M/s), climb(float deg)
 #    persistance_version is added when writing to cache
+#
+################################################################################
 
-import time, signal, threading, json, datetime, os, math, astro, TimeCalc, DayCalc
-from gps import *
+
+import time, signal, threading, json, datetime, os, socket, sys, math, logging, astro, TimeCalc, DayCalc
+logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
 
 CACHE_FILE_NAME     = '/var/cache/locationd/locationd.cache'
 PERSISTENCE_VER     = 4             # Version of persistence file. If versions don't match, file is ignored.
@@ -41,6 +44,9 @@ ALMANAC_ROUNDING    = 3             # How many places to round almanac values to
 # To shut down the poller, call:
 #    gpsd.join()
 #
+################################################################################
+
+import gps
 class GpsPoller(threading.Thread):
 
     def __init__(self):
@@ -50,12 +56,12 @@ class GpsPoller(threading.Thread):
         self.session = None
         try:
             threading.Thread.__init__(self)
-            self.session = gps(mode=WATCH_ENABLE)
+            self.session = gps.gps(mode=WATCH_ENABLE)
             self.watching = True
-            print('GPS monitoring started.')
+            logging.info('GPS monitoring started.')
         except:
             self.watching = False
-            print('Failed to open GPS stream. Falling back on cached values.')
+            logging.warning('Failed to open GPS stream. Falling back on cached values.')
 
     def value(self):
         return self.current_value
@@ -66,11 +72,10 @@ class GpsPoller(threading.Thread):
                 report = self.session.next()
                 if report['class'] == 'TPV':
                     self.current_value = self.session.next()
-                    #print(self.current_value)
                     if not self.system_time_has_been_set:
                         self.check_set_system_time(report)
             except:
-                print('Error reading gpsd data.')
+                logging.error('Error reading gpsd data.')
             time.sleep(0.2) # tune this, you might not get values that quickly
 
     def check_set_system_time(self, report):
@@ -80,13 +85,13 @@ class GpsPoller(threading.Thread):
             sys_time = datetime.datetime.now(datetime.timezone.utc)
             time_diff = abs((sys_time - rep_time).total_seconds())
             if time_diff > MAX_TIME_DIFFERENCE:
-                print('Sys time = %s' % (sys_time))
-                print('GSP time = %s' % (rep_time))
-                print('System time differes from GPS time by %i seconds. Updating.' % (int(time_diff)))
+                logging.info('Sys time = %s', sys_time)
+                logging.info('GSP time = %s', rep_time)
+                logging.info('System time differes from GPS time by %s seconds. Updating.', int(time_diff))
                 try:
                     os.system('date -s ' + report['time'])
                 except:
-                    print('Failed to set system time.')
+                    logging.error('Failed to set system time.')
 
     def join(self, timeout=None):
         self._stopevent.set()
@@ -96,9 +101,17 @@ class GpsPoller(threading.Thread):
         threading.Thread.join(self, timeout)
 
 
+################################################################################
+#
+# Location Service guts:
+#    global variables
+#    startup/shutdown
+#    GpsPoller -> state variable interface
+#
+################################################################################
+
 gpsp            = GpsPoller()
 state           = {'mode':0, 'time':'?', 'lat':0.0, 'lon':0.0, 'alt':0, 'speed':0.0, 'climb':0.0 }
-
 
 # Handle SIGTERM signal
 def signal_term_handler(signal, frame):
@@ -128,16 +141,16 @@ def load_state():
             content = cache.read()
         loaded_state = json.loads(content)
         if loaded_state['persistance_version'] != PERSISTENCE_VER:
-            print('Cache file wrong version, ignoring.')
+            logging.warning('Cache file wrong version, ignoring.')
             return
         state = loaded_state
         del state['persistance_version']
         state['mode'] = -1
-        print('Cache loaded.')
+        logging.info('Cache loaded.')
     except IOError:
-        print('Error reading cache file.')
+        logging.error('Error reading cache file.')
     except:
-        print('Error loading cache file.')
+        logging.error('Error loading cache file.')
 
 
 # Termination routine
@@ -146,9 +159,8 @@ def shutdown():
     gpsp.join() # Shuts down poller
     exit(0)
 
-
-# Get the current gps data and create a json string fron it.
-def get_json():
+# Update the global 'state' dictionary from the GpsPoller
+def update_state():
     global state
     report = gpsp.value()
 
@@ -165,16 +177,37 @@ def get_json():
     state['alt']   = getattr(report,'alt',state['alt'])
     state['speed'] = getattr(report,'speed',state['speed'])
     state['climb'] = getattr(report,'climb',state['climb'])
+
+
+################################################################################
+#
+# The socket server makes IPC with the system service possible.
+# Short keyword messages are sent to the socket, and JSON strings are returned.
+# Valid selectors:
+#    gps    Returns the state dictionary
+#    time   Returns the output from a TimeCalc (utc, lcoal, solar, sidereal, etc)
+#    day    Returns the shape-of-day for the current local day
+#    sun, moon, mercury, venus, mars, jupiter, saturn, uranus, neptune, pluto
+#           Returns name, alt, azm, and distance in miles
+################################################################################
+
+# Return a JSON string representing the current state:
+def get_json():
+    update_state()
     return json.dumps(state)
 
 
+# Generate the shape-of-day info dictionary, convert to JSON and return.
+# Note: this is extremely expensive on the RPiZero.
 def get_day_info():
+    update_state()
     di = DayCalc.DayCalc(state['lat'], state['lon'], state['alt'])
     return di.as_json()
 
 
 # Return JSON representing TimeCalc info
 def get_time_info():
+    update_state()
     tcalc = TimeCalc.TimeCalc(state['lat'], state['lon'])
     result             = {}
     result['utc']      = tcalc.getUtcTime().strftime('%H:%M:%S')
@@ -186,17 +219,18 @@ def get_time_info():
     result['lmst']     = tcalc.decimalHoursToHMS(tcalc.getLMST())
     result['doy']      = tcalc.getDOY(tcalc.getLocalTime())
     strResult          = json.dumps(result)
-    print('Result: %s' % (strResult))
+    logging.debug('Result: %s', strResult)
     return strResult
 
 
 # Return an almanac json blob for the body requested
 def get_almanac(body_name):
-    print('Generating almanac for %s' % (body_name))
+    logging.info('Generating almanac for %s', body_name)
     result = {}
     target = astro.body_from_name(body_name)
     if target is None:
         return'{"error": "name"}'
+    update_state()
     obsv   = astro.loc_from_data(state['lat'], state['lon'], state['alt'])
     # Use default system time; locationd has done its best to set it correctly
     name, alt, azm, dist, illum = astro.info(target, obsv, True)
@@ -208,37 +242,37 @@ def get_almanac(body_name):
     if illum is not None:
         result['illum'] = round(illum, ALMANAC_ROUNDING)
     strResult = json.dumps(result)
-    print('Result: %s' % (strResult))
+    logging.debug('Result: %s', strResult)
     return strResult
 
 
 # Never return: wait for socket connections
 def socket_server():
-    print('Starting socket server.')
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    print('socket created.')
+    logging.info('Starting socket server.')
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    logging.debug('socket created.')
     #Bind socket to local host and port
     try:
-        s.bind((HOST, PORT))
-        print('Socket bound to port %s on host %s.' % (PORT, HOST))
+        sock.bind((HOST, PORT))
+        logging.info('Socket bound to port %s on host %s.' % (PORT, HOST))
     except socket.error as msg:
-        print('Bind failed. Error Code : %s, Message: %s' & (str(msg[0]), str(msg[1])))
+        logging.critical('Socket bind failed.')
         sys.exit()
     except Exception as e:
-        print('Unknown exception:')
-        print(e)
-        print('Continuing...')
+        logging.warning('Unknown exception:')
+        logging.warning(e)
+        logging.warning('Continuing...')
     #Start listening on socket
-    s.listen(10)
-    print('Socket now listening')
+    sock.listen(10)
+    logging.info('Socket now listening')
 
     #now keep talking with the client
     while 1:
         #wait to accept a connection - blocking call
-        conn, addr = s.accept()
+        conn, addr = sock.accept()
         data = conn.recv(16)
         msg = data.decode()
-        print("Server received: '%s' from %s:%s" % (msg, addr[0], str(addr[1])))
+        logging.info("Server received: '%s' from %s:%s" % (msg, addr[0], str(addr[1])))
         if 'gps' == msg:
             reply = get_json()
         elif 'time' == msg:
@@ -248,19 +282,26 @@ def socket_server():
         elif msg in ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto']:
             reply = get_almanac(msg)
         else:
-            print('Error: unexpected selector in socket msg: %s' % (msg))
+            logging.warning('Unexpected selector in socket msg: %s' % (msg))
             reply = '{"error":"' + msg + '"}'
         conn.sendall(reply.encode())
         conn.close()
-    s.close()
+    sock.close()
 
+################################################################################
+#
+# Location Service startup code
+#
+################################################################################
 
 if __name__ == '__main__':
     load_state()
     gpsp.start()
-    print('gpsd started.')
+    logging.info('gpsd started.')
     try:
         while True:
             socket_server()
-    except:
+    except Exception as ex:
+        logging.critical('locationd is shutting down due to an exception.')
+        logging.critical('Exception: %s', ex)
         shutdown()
