@@ -205,35 +205,41 @@ class DayCalc:
         print('Lunar Culmination Alt     ', round(self.LCALT, 2))
         print('Moon Set                  ', 'None' if self.MSET is None else self.MSET.strftime('%H:%M:%S'))
 
-    def print_report_header(self):
+    def print_report_header(self, fixed = True):
         print('For latitude {0}, longitude {1}, at {2} meters:'.format(self.LAT, self.LON, self.ALT))
-        print('Date        AstDawn   NautDawn  CivDawn   SunRise   SolNoon   NoonAlt  SunSet    CivTwi    NautTwi   AstTwi    Illm%  MoonRise  MoonCulm  CulmAlt  MoonSet')
-        print('----------  --------  --------  --------  --------  --------  -------  --------  --------  --------  --------  -----  --------  --------  -------  --------')
+        if fixed:
+            print('Date        AstDawn   NautDawn  CivDawn   SunRise   SolNoon   NoonAlt  SunSet    CivTwi    NautTwi   AstTwi    Illm%  MoonRise  MoonCulm  CulmAlt  MoonSet')
+            print('----------  --------  --------  --------  --------  --------  -------  --------  --------  --------  --------  -----  --------  --------  -------  --------')
+        else:
+            print('Date\tAstDawn\tNautDawn\tCivDawn\tSunRise\tSolNoon\tNoonAlt\tSunSet\tCivTwi\tNautTwi\tAstTwi\tIllm%\tMoonRise\tMoonCulm\tCulmAlt\tMoonSet')
 
     def print_report_footer(self):
         print('----------  --------  --------  --------  --------  --------  -------  --------  --------  --------  --------  -----  --------  --------  -------  --------')
         print('Date        AstDawn   NautDawn  CivDawn   SunRise   SolNoon   NoonAlt  SunSet    CivTwi    NautTwi   AstTwi    Illm%  MoonRise  MoonCulm  CulmAlt  MoonSet')
 
-    def print_report_row(self):
+    def print_report_row(self, fixed = True):
         if not self.RDY:
             self.calc_all()
-        print('{0}  {1:8s}  {2:8s}  {3:8s}  {4:8s}  {5:8s}  {6:7.2f}  {7:8s}  {8:8s}  {9:8s}  {10:8s}  {11:5.1F}  {12:8s}  {13:8s} {14:8.1f}  {15:8s}'.format(
+        fixed_format  = '{0}  {1:8s}  {2:8s}  {3:8s}  {4:8s}  {5:8s}  {6:7.2f}  {7:8s}  {8:8s}  {9:8s}  {10:8s}  {11:5.1f}  {12:8s}  {13:8s} {14:8.1f}  {15:8s}'
+        tabbed_format = '{0}\t{1:s}\t{2:s}\t{3:s}\t{4:s}\t{5:s}\t{6:7.2f}\t{7:s}\t{8:s}\t{9:s}\t{10:s}\t{11:5.1f}\t{12:s}\t{13:s}\t{14:8.1f}\t{15:s}'
+        fmt = fixed_format if fixed else tabbed_format
+        print(fmt.format(
             self.DATE.date(),
-            self.BMAT.strftime('%H:%M:%S'),
-            self.BMNT.strftime('%H:%M:%S'),
-            self.BMCT.strftime('%H:%M:%S'),
-            self.SRISE.strftime('%H:%M:%S'),
-            'None' if self.MSET is None else self.MSET.strftime('%H:%M:%S'),
-            0.0 if self.SCALT is None else round(self.SCALT, 2),
-            self.SSET.strftime('%H:%M:%S'),
-            self.EECT.strftime('%H:%M:%S'),
-            self.EENT.strftime('%H:%M:%S'),
-            self.EEAT.strftime('%H:%M:%S'),
-            round(self.LPHA, 1),
+            'None' if self.BMAT  is None else self.BMAT.strftime('%H:%M:%S'),
+            'None' if self.BMNT  is None else self.BMNT.strftime('%H:%M:%S'),
+            'None' if self.BMCT  is None else self.BMCT.strftime('%H:%M:%S'),
+            'None' if self.SRISE is None else self.SRISE.strftime('%H:%M:%S'),
+            'None' if self.MSET  is None else self.MSET.strftime('%H:%M:%S'),
+            0.0 if self.SCALT    is None else round(self.SCALT, 2),
+            'None' if self.SSET  is None else self.SSET.strftime('%H:%M:%S'),
+            'None' if self.EECT  is None else self.EECT.strftime('%H:%M:%S'),
+            'None' if self.EENT  is None else self.EENT.strftime('%H:%M:%S'),
+            'None' if self.EEAT  is None else self.EEAT.strftime('%H:%M:%S'),
+            0.0 if self.LPHA     is None else round(self.LPHA, 1),
             'None' if self.MRISE is None else self.MRISE.strftime('%H:%M:%S'),
-            'None' if self.LCUL is None else self.LCUL.strftime('%H:%M:%S'),
-            0.0 if self.LCALT is None else round(self.LCALT, 2),
-            'None' if self.MSET is None else self.MSET.strftime('%H:%M:%S')
+            'None' if self.LCUL  is None else self.LCUL.strftime('%H:%M:%S'),
+            0.0 if self.LCALT    is None else round(self.LCALT, 2),
+            'None' if self.MSET  is None else self.MSET.strftime('%H:%M:%S')
             ))
 
 if '__main__' == __name__:
