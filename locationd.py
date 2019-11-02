@@ -225,7 +225,7 @@ def get_time_info():
 
 # Return an almanac json blob for the body requested
 def get_almanac(body_name):
-    logging.info('Generating almanac for %s', body_name)
+    logging.debug('Generating almanac for %s', body_name)
     result = {}
     target = astro.body_from_name(body_name)
     if target is None:
