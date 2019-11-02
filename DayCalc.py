@@ -229,7 +229,7 @@ class DayCalc:
             'None' if self.BMNT  is None else self.BMNT.strftime('%H:%M:%S'),
             'None' if self.BMCT  is None else self.BMCT.strftime('%H:%M:%S'),
             'None' if self.SRISE is None else self.SRISE.strftime('%H:%M:%S'),
-            'None' if self.MSET  is None else self.MSET.strftime('%H:%M:%S'),
+            'None' if self.SCUL  is None else self.SCUL.strftime('%H:%M:%S'),
             0.0 if self.SCALT    is None else round(self.SCALT, 2),
             'None' if self.SSET  is None else self.SSET.strftime('%H:%M:%S'),
             'None' if self.EECT  is None else self.EECT.strftime('%H:%M:%S'),
