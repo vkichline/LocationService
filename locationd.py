@@ -2,47 +2,50 @@
 
 ################################################################################
 #
-# Service to accumulate gps and imu data from BerryGPS/IMU and make it easily available
-# Service control file for user service at /usr/lib/systemd/user/locationd.service
-# NOTE: changed from user to system service and moved control file to /etc/systemd/system/locationd.service
-# Article on develping Python services: https://github.com/torfsen/python-systemd-tutorial
-# Additional functionality:
-#    When GPS state transitions to 2 or 3 and system time has not been set since service started:
-#        Check to see if system time is more than 5 seconds different than GPS time.
-#        If time differs, et system time
-# Van Kichline, September 2019
-# October:
-#    Adding planetary almanac, initially for Sun and Moon
-#    Functionality is astro.py module
+#    Service to accumulate gps and imu data from BerryGPS/IMU and make it easily available
+#    Service control file for user service at /usr/lib/systemd/user/locationd.service
+#    NOTE: changed from user to system service and moved control file to /etc/systemd/system/locationd.service
+#    Article on develping Python services: https://github.com/torfsen/python-systemd-tutorial
+#    Additional functionality:
+#        When GPS state transitions to 2 or 3 and system time has not been set since service started:
+#            Check to see if system time is more than 5 seconds different than GPS time.
+#            If time differs, et system time
+#    Van Kichline, September 2019
+#    October:
+#        Adding planetary almanac, initially for Sun and Moon
+#        Functionality is astro.py module
 #
-# Names of the GpsState properties:
-#    mode(int), time(str), lat(float deg), lon(float deg), alt(int M), speed(float M/s), climb(float deg)
-#    persistance_version is added when writing to cache
+#    Names of the GpsState properties:
+#        mode(int), time(str), lat(float deg), lon(float deg), alt(int M), speed(float M/s), climb(float deg)
+#        persistance_version is added when writing to cache
 #
 ################################################################################
 
-
+# Load the settings dictionary and access settings as: cfg.get['KEY']
+import configuration as cfg
 import time, signal, threading, json, datetime, os, socket, sys, math, logging, astro, TimeCalc, DayCalc
-logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
 
-CACHE_FILE_NAME     = '/var/cache/locationd/locationd.cache'
-PERSISTENCE_VER     = 4             # Version of persistence file. If versions don't match, file is ignored.
-HOST                = '127.0.0.1'   # for this machine only
-PORT                = 9999          # Arbitrary non-privileged port
-MAX_TIME_DIFFERENCE = 10            # Max # seconds GPS can differ from system time
-ALMANAC_ROUNDING    = 3             # How many places to round almanac values to
+logging.basicConfig(format='%(levelname)s:%(message)s', level=cfg.locationd['LOGGING_LEVEL'])
+logging.info('Configuration file loaded. Logging level: %s', cfg.locationd['LOGGING_LEVEL'])
+
+PERSISTENCE_VER     = 4  # Version of persistence file. If versions don't match, file is ignored.
+CACHE_FILE_NAME     = cfg.locationd['CACHE_FILE_NAME']
+SOCKET_HOST         = cfg.locationd['SOCKET_HOST']
+SOCKET_PORT         = cfg.locationd['SOCKET_PORT']
+MAX_TIME_DIFFERENCE = cfg.locationd['MAX_TIME_DIFFERENCE']
+ALMANAC_ROUNDING    = cfg.locationd['ALMANAC_ROUNDING']
 
 
 ################################################################################
 #
-# This class runs a thread that acquires the latest data from gpsd.
-# To begin acuiring data, run:
-#    gpsp = GpsPoller()
-#    gpsp.start()
-# To acquire the dictionary of current TVP values, call:
-#    gpsp.value()
-# To shut down the poller, call:
-#    gpsd.join()
+#    This class runs a thread that acquires the latest data from gpsd.
+#    To begin acuiring data, run:
+#        gpsp = GpsPoller()
+#        gpsp.start()
+#    To acquire the dictionary of current TVP values, call:
+#        gpsp.value()
+#    To shut down the poller, call:
+#        gpsd.join()
 #
 ################################################################################
 
@@ -50,13 +53,13 @@ import gps
 class GpsPoller(threading.Thread):
 
     def __init__(self):
-        self._stopevent = threading.Event() # Used to shut down the poller
+        self._stopevent    = threading.Event() # Used to shut down the poller
         self.current_value = {}
         self.system_time_has_been_set = False
         self.session = None
         try:
             threading.Thread.__init__(self)
-            self.session = gps.gps(mode=WATCH_ENABLE)
+            self.session  = gps.gps(mode=WATCH_ENABLE)
             self.watching = True
             logging.info('GPS monitoring started.')
         except:
@@ -81,8 +84,8 @@ class GpsPoller(threading.Thread):
     def check_set_system_time(self, report):
         if report['mode'] >= 2:
             self.system_time_has_been_set = True
-            rep_time = datetime.datetime.strptime(report['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
-            sys_time = datetime.datetime.now(datetime.timezone.utc)
+            rep_time  = datetime.datetime.strptime(report['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
+            sys_time  = datetime.datetime.now(datetime.timezone.utc)
             time_diff = abs((sys_time - rep_time).total_seconds())
             if time_diff > MAX_TIME_DIFFERENCE:
                 logging.info('Sys time = %s', sys_time)
@@ -103,15 +106,15 @@ class GpsPoller(threading.Thread):
 
 ################################################################################
 #
-# Location Service guts:
-#    global variables
-#    startup/shutdown
-#    GpsPoller -> state variable interface
+#    Location Service guts:
+#        global variables
+#        startup/shutdown
+#        GpsPoller -> state variable interface
 #
 ################################################################################
 
-gpsp            = GpsPoller()
-state           = {'mode':0, 'time':'?', 'lat':0.0, 'lon':0.0, 'alt':0, 'speed':0.0, 'climb':0.0 }
+gpsp   = GpsPoller()
+state  = {'mode':0, 'time':'?', 'lat':0.0, 'lon':0.0, 'alt':0, 'speed':0.0, 'climb':0.0 }
 
 # Handle SIGTERM signal
 def signal_term_handler(signal, frame):
@@ -159,6 +162,7 @@ def shutdown():
     gpsp.join() # Shuts down poller
     exit(0)
 
+
 # Update the global 'state' dictionary from the GpsPoller
 def update_state():
     global state
@@ -181,14 +185,15 @@ def update_state():
 
 ################################################################################
 #
-# The socket server makes IPC with the system service possible.
-# Short keyword messages are sent to the socket, and JSON strings are returned.
-# Valid selectors:
-#    gps    Returns the state dictionary
-#    time   Returns the output from a TimeCalc (utc, lcoal, solar, sidereal, etc)
-#    day    Returns the shape-of-day for the current local day
-#    sun, moon, mercury, venus, mars, jupiter, saturn, uranus, neptune, pluto
+#    The socket server makes IPC with the system service possible.
+#    Short keyword messages are sent to the socket, and JSON strings are returned.
+#    Valid selectors:
+#        gps    Returns the state dictionary
+#        time   Returns the output from a TimeCalc (utc, lcoal, solar, sidereal, etc)
+#        day    Returns the shape-of-day for the current local day
+#        sun, moon, mercury, venus, mars, jupiter, saturn, uranus, neptune, pluto
 #           Returns name, alt, azm, and distance in miles
+#
 ################################################################################
 
 # Return a JSON string representing the current state:
@@ -208,7 +213,7 @@ def get_day_info():
 # Return JSON representing TimeCalc info
 def get_time_info():
     update_state()
-    tcalc = TimeCalc.TimeCalc(state['lat'], state['lon'])
+    tcalc              = TimeCalc.TimeCalc(state['lat'], state['lon'])
     result             = {}
     result['utc']      = tcalc.getUtcTime().strftime('%H:%M:%S')
     result['local']    = tcalc.getLocalTime().strftime('%H:%M:%S')
@@ -253,8 +258,8 @@ def socket_server():
     logging.debug('socket created.')
     #Bind socket to local host and port
     try:
-        sock.bind((HOST, PORT))
-        logging.info('Socket bound to port %s on host %s.' % (PORT, HOST))
+        sock.bind((SOCKET_HOST, SOCKET_PORT))
+        logging.info('Socket bound to port %s on host %s.' % (SOCKET_PORT, SOCKET_HOST))
     except socket.error as msg:
         logging.critical('Socket bind failed.')
         sys.exit()
@@ -288,9 +293,10 @@ def socket_server():
         conn.close()
     sock.close()
 
+
 ################################################################################
 #
-# Location Service startup code
+#    Location Service startup code
 #
 ################################################################################
 
