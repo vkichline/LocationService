@@ -69,9 +69,9 @@ class DayCalc:
         self.ALT  = altitude
         self.topo = a.api.Topos(latitude, longitude, elevation_m=altitude)
         self.loc  = self.topo + a.earth
-        self.clear_data()
+        self.init_data()
 
-    def clear_data(self):
+    def init_data(self):
         self.BMAT  = None,
         self.BMNT  = None
         self.BMCT  = None
@@ -92,7 +92,7 @@ class DayCalc:
 
     def change_date(self, datetime):
         self.DATE = datetime # Local time
-        self.clear_data()
+        self.init_data()
     
     def calc_offset(self):
         ta = a.ts.utc(self.DATE.year, self.DATE.month, self.DATE.day, 0, 0, 0)
@@ -101,11 +101,11 @@ class DayCalc:
         logging.debug('Offset: %s', self.offset)
 
     def twilight(self, kind):
-        if self.ASTRONOMICAL_TWILIGHT == kind:
+        if kind == self.ASTRONOMICAL_TWILIGHT:
             radius = 18.0
-        elif self.NAUTICAL_TWILIGHT   == kind:
+        elif kind == self.NAUTICAL_TWILIGHT:
             radius = 12.0
-        elif self.CIVIL_TWILIGHT      == kind:
+        elif kind == self.CIVIL_TWILIGHT:
             radius = 6.0
         else:
             raise IndexError()
@@ -115,25 +115,6 @@ class DayCalc:
         day_end   = self.DATE
         day_end   = day_end.replace(hour=23, minute=59, second=59)
         return a.almanac.find_discrete(a.ts.utc(day_start), a.ts.utc(day_end), f_of_t)
-
-    def culmination(self, body):
-        # From https://github.com/skyfielders/python-skyfield/issues/243
-        def f(t):
-            alt, az, distance = self.loc.at(t).observe(body).apparent().altaz()
-            return alt.degrees
-        f.rough_period = 1.0
-        t0   = a.ts.utc(self.DATE.year, self.DATE.month, self.DATE.day, + self.offset, 0, 0)
-        t1   = a.ts.utc(self.DATE.year, self.DATE.month, self.DATE.day, 23 + self.offset, 59, 59)
-        assert(0 == a.time_to_local_datetime(t0).time().hour)
-        try:
-            times, maxima = a.almanac._find_maxima(t0, t1, f, epsilon=0.000001) # tuned to avoid exceptions
-            t   = a.time_to_local_datetime(times[0])
-            alt = maxima[0]
-            return (t, alt)
-        except Exception as ex:
-            if body != a.moon:
-                logging.warning('Culmination: %s : %s -> %s', ex, a.time_to_local_datetime(t0), a.time_to_local_datetime(t1))
-            return None, None
 
     def rise_and_set(self, body):
         t0        = a.ts.utc(self.DATE.year, self.DATE.month, self.DATE.day, + self.offset, 0, 0)
@@ -149,14 +130,14 @@ class DayCalc:
         return rise_time, set_time
 
     def calc_all(self):
-        times, kinds = self.twilight(self.ASTRONOMICAL_TWILIGHT)
+        times, _kinds = self.twilight(self.ASTRONOMICAL_TWILIGHT)
         self.BMAT, self.EEAT    = a.time_to_local_datetime(times[0]), a.time_to_local_datetime(times[1])
-        times, kinds = self.twilight(self.NAUTICAL_TWILIGHT)
+        times, _kinds = self.twilight(self.NAUTICAL_TWILIGHT)
         self.BMNT, self.EENT    = a.time_to_local_datetime(times[0]), a.time_to_local_datetime(times[1])
-        times, kinds = self.twilight(self.CIVIL_TWILIGHT)
+        times, _kinds = self.twilight(self.CIVIL_TWILIGHT)
         self.BMCT, self.EECT    = a.time_to_local_datetime(times[0]), a.time_to_local_datetime(times[1])
-        self.SCUL, self.SCALT   = self.culmination(a.sun)
-        self.LCUL, self.LCALT   = self.culmination(a.moon)
+        self.SCUL, self.SCALT   = a.culmination(a.sun,  self.loc, a.ts.utc(self.DATE))
+        self.LCUL, self.LCALT   = a.culmination(a.moon, self.loc, a.ts.utc(self.DATE))
         self.SRISE, self.SSET   = self.rise_and_set(a.sun)
         self.MRISE, self.MSET   = self.rise_and_set(a.moon)
         self.LPHA               = a.almanac.fraction_illuminated(a.planets, 'moon', a.ts.utc(self.DATE)) * 100.0
@@ -171,23 +152,23 @@ class DayCalc:
             self.calc_all()
         result = {}
         result['DATE']  = str(self.DATE.date())
-        result['LAT']   = str(round(self.LAT, 5))
-        result['LON']   = str(round(self.LON, 5))
-        result['ALT']   = str(round(self.ALT, 1))
+        result['LAT']   = round(self.LAT, 5)
+        result['LON']   = round(self.LON, 5)
+        result['ALT']   = round(self.ALT, 1)
         result['BMAT']  = '' if self.BMAT is None else self.BMAT.strftime('%H:%M:%S')
         result['BMNT']  = '' if self.BMNT is None else self.BMNT.strftime('%H:%M:%S')
         result['BMCT']  = '' if self.BMCT is None else self.BMCT.strftime('%H:%M:%S')
         result['SRISE'] = '' if self.SRISE is None else self.SRISE.strftime('%H:%M:%S')
         result['SCUL']  = '' if self.SCUL is None else self.SCUL.strftime('%H:%M:%S')
-        result['SCALT'] = str(round(self.SCALT, 2))
+        result['SCALT'] = round(self.SCALT, 2)
         result['SSET']  = '' if self.SSET is None else self.SSET.strftime('%H:%M:%S')
         result['EECT']  = '' if self.EECT is None else self.EECT.strftime('%H:%M:%S')
         result['EENT']  = '' if self.EENT is None else self.EENT.strftime('%H:%M:%S')
         result['EEAT']  = '' if self.EEAT is None else self.EEAT.strftime('%H:%M:%S')
-        result['LPHA']  = str(round(self.LPHA, 1)) + '%'
+        result['LPHA']  = round(self.LPHA, 1)
         result['MRISE'] = '' if self.MRISE is None else self.MRISE.strftime('%H:%M:%S')
         result['LCUL']  = '' if self.LCUL is None else self.LCUL.strftime('%H:%M:%S')
-        result['LCALT'] = str(round(self.LCALT, 2))
+        result['LCALT'] = 0.0 if self.LCALT is None else round(self.LCALT, 2)
         result['MSET']  = '' if self.MSET is None else self.MSET.strftime('%H:%M:%S')
         return result
 
@@ -198,21 +179,21 @@ class DayCalc:
         print('Lat                       ', str(round(self.LAT, 5)))
         print('Lon                       ', str(round(self.LON, 5)))
         print('Alt                       ', str(round(self.ALT, 2)))
-        print('Astronomical Dawn         ', self.BMAT.strftime('%H:%M:%S'))
-        print('Nautical Dawn             ', self.BMNT.strftime('%H:%M:%S'))
-        print('Civil Dawn                ', self.BMCT.strftime('%H:%M:%S'))
-        print('Sunrise                   ', self.SRISE.strftime('%H:%M:%S'))
-        print('Solar Noon Time           ', self.SCUL.strftime('%H:%M:%S'))
+        print('Astronomical Dawn         ', '' if self.BMAT is None else self.BMAT.strftime('%H:%M:%S'))
+        print('Nautical Dawn             ', '' if self.BMNT is None else self.BMNT.strftime('%H:%M:%S'))
+        print('Civil Dawn                ', '' if self.BMCT is None else self.BMCT.strftime('%H:%M:%S'))
+        print('Sunrise                   ', '' if self.SRISE is None else self.SRISE.strftime('%H:%M:%S'))
+        print('Solar Noon Time           ', '' if self.SCUL is None else self.SCUL.strftime('%H:%M:%S'))
         print('Solar Noon Alt            ', round(self.SCALT, 2))
-        print('Sunset                    ', self.SSET.strftime('%H:%M:%S'))
-        print('End Civil Twilight        ', self.EECT.strftime('%H:%M:%S'))
-        print('End Nautical Twilight     ', self.EENT.strftime('%H:%M:%S'))
-        print('End Astronomical Twilight ', self.EEAT.strftime('%H:%M:%S'))
+        print('Sunset                    ', '' if self.SSET is None else self.SSET.strftime('%H:%M:%S'))
+        print('End Civil Twilight        ', '' if self.EECT is None else self.EECT.strftime('%H:%M:%S'))
+        print('End Nautical Twilight     ', '' if self.EENT is None else self.EENT.strftime('%H:%M:%S'))
+        print('End Astronomical Twilight ', '' if self.EEAT is None else self.EEAT.strftime('%H:%M:%S'))
         print('Lunar illumination %      ', round(self.LPHA, 1))
-        print('Moon Rise                 ', self.MRISE.strftime('%H:%M:%S'))
-        print('Lunar Culmination         ', self.LCUL.strftime('%H:%M:%S'))
-        print('Lunar Culmination Alt     ', round(self.LCALT, 2))
-        print('Moon Set                  ', 'None' if self.MSET is None else self.MSET.strftime('%H:%M:%S'))
+        print('Moon Rise                 ', '' if self.MRISE is None else self.MRISE.strftime('%H:%M:%S'))
+        print('Lunar Culmination         ', '' if self.LCUL is None else self.LCUL.strftime('%H:%M:%S'))
+        print('Lunar Culmination Alt     ', 0.0 if self.LCALT is None else round(self.LCALT, 2))
+        print('Moon Set                  ', '' if self.MSET is None else self.MSET.strftime('%H:%M:%S'))
 
     def print_report_header(self, fixed = True):
         print('For latitude {0}, longitude {1}, at {2} meters:'.format(self.LAT, self.LON, self.ALT))
@@ -249,7 +230,7 @@ class DayCalc:
             '' if self.LCUL  is None else self.LCUL.strftime('%H:%M:%S'),
             0.0 if self.LCALT    is None else round(self.LCALT, 2),
             '' if self.MSET  is None else self.MSET.strftime('%H:%M:%S')
-            ))
+        ))
 
 if '__main__' == __name__:
     t      = a.time_to_local_datetime(a.now())

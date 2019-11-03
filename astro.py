@@ -62,7 +62,7 @@ from skyfield import api, almanac
 from skyfield.api import Star
 from skyfield.data import hipparcos
 from skyfield.nutationlib import iau2000b
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 
 LOAD_HIPPARCOS  = False  # TODO: Should be a function of cmd line param
@@ -116,6 +116,33 @@ def risings_and_settings(ephemeris, target, observer, horizon=-0.3333, radius=0)
         return topos_at(t).observe(target).apparent().altaz()[0].degrees > h
     is_body_up_at.rough_period = 0.5  # twice a day
     return is_body_up_at
+
+
+# From https://github.com/skyfielders/python-skyfield/issues/243
+def culmination(body, obsv, t):
+    def f(t):
+        alt, _az, _distance = obsv.at(t).observe(body).apparent().altaz()
+        return alt.degrees
+    f.rough_period = 1.0
+
+    dt   = t.utc_datetime()
+    # Determine time offset for the day (TODO: may be 1 hour off on DST change dates)
+    ta = ts.utc(dt.year, dt.month, dt.day, 0, 0, 0)
+    tl = time_to_local_datetime(ta)
+    offset = 24 - tl.hour
+
+    t0   = ts.utc(dt.year, dt.month, dt.day,  offset,  0,  0)
+    t1   = ts.utc(dt.year, dt.month, dt.day, 23 + offset, 59, 59)
+    assert(0 == time_to_local_datetime(t0).time().hour)
+    try:
+        times, maxima = almanac._find_maxima(t0, t1, f, epsilon=0.000001) # tuned to avoid exceptions
+        t   = time_to_local_datetime(times[0])
+        alt = maxima[0]
+        return (t, alt)
+    except Exception as ex:
+        if body != moon:
+            print('Culmination: %s : %s -> %s' % (ex, time_to_local_datetime(t0), time_to_local_datetime(t1)))
+        return None, None
 
 
 def time_to_local_datetime(t):
