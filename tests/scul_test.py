@@ -17,7 +17,7 @@ t = pacific.localize(datetime(year, month, day))
 tester = DayCalc.DayCalc(a.home_topo.latitude.degrees, a.home_topo.longitude.degrees, a.home_topo.elevation.m, t)
 
 for day in range(365):
-    tt, alt = tester.culmination(a.sun)
+    tt, alt = a.culmination(a.sun, tester.loc, a.ts.utc(t))
     assert tt is not None
     print(tt, alt)
     t = t + timedelta(days=1)
