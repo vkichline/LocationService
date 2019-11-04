@@ -139,9 +139,10 @@ def culmination(body, obsv, t):
         t   = time_to_local_datetime(times[0])
         alt = maxima[0]
         return (t, alt)
-    except Exception as ex:
-        if body != moon:
-            print('Culmination: %s : %s -> %s' % (ex, time_to_local_datetime(t0), time_to_local_datetime(t1)))
+    # except Exception as ex:
+    #     if body != moon:
+    #         print('Culmination: %s : %s -> %s' % (ex, time_to_local_datetime(t0), time_to_local_datetime(t1)))
+    except:
         return None, None
 
 
@@ -153,9 +154,9 @@ def time_to_local_datetime(t):
 
 # Observe a target body from an obsv body or Topo and return info.
 # If pos_only is omitted or False, return:
-# name, alt, azm, dist, rising, setting, illum, const for a target body
-# alt and azm are in decimal degrees
-# distance is in miles, rise and set are datetime's in local time.
+# name, alt, azm, dist, rising, culmination, setting, culmatl, illum, const for a target body
+# alt, azm and culmalt are in decimal degrees
+# distance is in miles, rise, culmination and set are datetime's in local time.
 # illum is in percentage
 # const is a string abbreviation.
 #
@@ -189,16 +190,17 @@ def info(target, obsv, pos_only=False, t=None):
         rad = 0.5
     else:
         rad = 0.0
-    t, y = almanac.find_discrete(day_start(), day_end(),
+    ta, ya = almanac.find_discrete(day_start(), day_end(),
                                  risings_and_settings(planets, target, obsv, radius=rad))
-    for yi, ti in zip(y, t):
+    culm_time, culm_alt = culmination(target, obsv, t)
+    for yi, ti in zip(ya, ta):
         if yi:
             rise_time = ti
         else:
             set_time = ti
     rise_time = time_to_local_datetime(rise_time)
     set_time  = time_to_local_datetime(set_time)
-    return name, alt, azm, dist, rise_time, set_time, illum, const
+    return name, alt, azm, dist, rise_time, culm_time, set_time, culm_alt, illum, const
 
 
 # Given an obsv body or Topo (example: home_pos), print an ephemeris to stdout. If pos_only, then just alt, azm and distance are printed.
@@ -211,24 +213,44 @@ def print_planets(obsv, pos_only=False, t=None):
         t = now()
     def print_title(pos_only):
         dt = time_to_local_datetime(t)
-        print('%s for lat %.4f lon %.4f at %s local time.' %
-              ('Fast data' if pos_only else 'Data', home_topo.latitude.degrees, home_topo.longitude.degrees, dt.strftime('%H:%M:%S')))
+        print('%s for %s from latitude %.4f, longitude %.4f at %s local time.' % (
+            'Fast data' if pos_only else 'Data',
+            time_to_local_datetime(t).date(),
+            home_topo.latitude.degrees,
+            home_topo.longitude.degrees,
+            dt.strftime('%H:%M:%S')))
     def print_header(pos_only):
         if pos_only:
             print('Body       Alt     Azm      Distance')
             print('-------  ------  ------  -------------')
         else:
-            print('Body       Alt     Azm   Const   Rising   Setting   Illum     Distance')
-            print('-------  ------  ------  -----  --------  --------  -----  -------------')
+            print('Body       Alt     Azm   Const   Rising    Culmin   Setting    CulAlt  Illum     Distance')
+            print('-------  ------  ------  -----  --------  --------  --------   ------  -----  -------------')
     def print_body(body, pos_only):
         if pos_only:
             name, alt, azm, dist, illum = info(body, obsv, True, t)
-            print('{0:7s}  {1:6.2f}  {2:6.2f}  {3:13,}'.format(name, alt, azm, int(dist)))
+            print('{0:7s}  {1:6.2f}  {2:6.2f}  {3:13,}'.format(
+                name,
+                alt,
+                azm,
+                int(dist)
+            ))
         else:
-            name, alt, azm, dist, rise_time, set_time, illum, const = info(body, obsv, False, t)
+            name, alt, azm, dist, rise_time, culm_time, set_time, culm_alt, illum, const = info(body, obsv, False, t)
             if illum is None:
                 illum = 100.0
-            print('{0:7s}  {1:6.2f}  {2:6.2f}  {3:5s}  {4:8s}  {5:8s}  {6:5.1f}  {7:13,}'.format(name, alt, azm, const, rise_time.strftime('%H:%M:%S'), set_time.strftime('%H:%M:%S'), illum, int(dist)))
+            print('{0:7s}  {1:6.2f}  {2:6.2f}  {3:5s}  {4:8s}  {5:8s}  {6:8s}  {7:7.2f}  {8:5.1f}  {9:13,}'.format(
+                name,
+                alt,
+                azm,
+                const,
+                '' if rise_time is None else rise_time.strftime('%H:%M:%S'),
+                '' if culm_time is None else culm_time.strftime('%H:%M:%S'),
+                '' if set_time  is None else set_time.strftime('%H:%M:%S'),
+                0.0 if culm_alt is  None else culm_alt,
+                illum,
+                int(dist)
+            ))
     print_title(pos_only)
     print_header(pos_only)
     for body in [sun, moon, mercury, venus, mars, jupiter, saturn, uranus, neptune, pluto]:
