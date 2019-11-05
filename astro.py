@@ -106,7 +106,6 @@ def pos_to_constellation(pos):
 # From: https://github.com/skyfielders/python-skyfield/blob/master/skyfield/almanac.py
 def risings_and_settings(ephemeris, target, observer, horizon=-0.3333, radius=0):
     h = horizon - radius
-
     def is_body_up_at(t):
         t._nutation_angles = iau2000b(t.tt)
         return observer.at(t).observe(target).apparent().altaz()[0].degrees > h
@@ -189,13 +188,14 @@ def info(target, observer, pos_only=False, t=None):
                 day_end(t),
                 risings_and_settings(planets, target, observer, radius=rad))
     culm_time, culm_alt = culmination(target, observer, t)
+    rise_time = set_time = None
     for yi, ti in zip(ya, ta):
         if yi:
             rise_time = ti
         else:
             set_time = ti
-    rise_time = time_to_local_datetime(rise_time)
-    set_time  = time_to_local_datetime(set_time)
+    rise_time = None if rise_time is None else time_to_local_datetime(rise_time)
+    set_time  = None if set_time  is None else time_to_local_datetime(set_time)
     return name, alt, azm, dist, rise_time, culm_time, set_time, culm_alt, illum, const
 
 
@@ -260,19 +260,19 @@ def now():
 
 def year_start(t):
     dt = time_to_local_datetime(t)
-    dt = dt.replace(month=1, day=1, hour=0, minute=0, second=0)
+    dt = dt.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
     return ts.utc(dt)
 
 
 def year_end(t):
     dt = time_to_local_datetime(t)
-    dt = dt.replace(month=12, day=31, hour=23, minute=59, second=59)
+    dt = dt.replace(month=12, day=31, hour=23, minute=59, second=59, microsecond=999999)
     return ts.utc(dt)
 
 
 def month_start(t):
     dt = time_to_local_datetime(t)
-    dt = dt.replace(day=1, hour=0, minute=0, second=0)
+    dt = dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     return ts.utc(dt)
 
 
@@ -281,24 +281,24 @@ def month_end(t):
     md = [31, 28, 31, 30, 31, 31, 30, 31, 30, 31, 30, 31]
     if calendar.isleap(dt.year): md[1] += 1
     ld = md[dt.month]
-    dt = dt.replace(day=ld, hour=23, minute=59, second=59)
+    dt = dt.replace(day=ld, hour=23, minute=59, second=59, microsecond=999999)
     return ts.utc(dt)
 
 
 def day_start(t):
     dt = time_to_local_datetime(t)
-    dt = dt.replace(hour=0, minute=0, second=0)
+    dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
     return ts.utc(dt)
 
 def day_noon(t):
     dt = time_to_local_datetime(t)
-    dt = dt.replace(hour=12, minute=0, second=0)
+    dt = dt.replace(hour=12, minute=0, second=0, microsecond=0)
     return ts.utc(dt)
 
 
 def day_end(t):
     dt = time_to_local_datetime(t)
-    dt = dt.replace(hour=23, minute=59, second=59)
+    dt = dt.replace(hour=23, minute=59, second=59, microsecond=999999)
     return ts.utc(dt)
 
 
