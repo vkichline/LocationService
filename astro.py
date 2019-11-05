@@ -35,13 +35,10 @@
 # astro.home_topo      Topocentric location of my house (without earth vector)
 # astro.home_loc       Topocentric location of my house (with earth vector added)
 # astro.now()          Time object represeting moment the function is called
-## astro.this_year()    Integer for this year (local time)
-## astro.this_month()   Integer for this month (local time)
-## astro.this_day()     Integer for this day (local time)
-## astro.year_start()   Time object for the first moment of this local year, converted to UTC
-## astro.year_end()     Time object for the last moment of this local year, converted to UTC
-## astro.month_start()  Time object for the first moment of this local month, converted to UTC
-## astro.month_end()    Time object for the last moment of this local month, converted to UTC
+# astro.year_start(t)  Time object for the first moment of the year of the time provided
+# astro.year_end(t)    Time object for the last moment of the year of the time provided
+# astro.month_start(t) Time object for the first moment of the month of the time provided
+# astro.month_end(t)   Time object for the last moment of the month of the time provided
 # astro.day_start(t)   Time object for the first moment of the day of the time provided
 # astro.day_noon(t)    Time object for noon of of the time provided
 # astro.day_end(t)     Time object for the last moment of of the time provided
@@ -52,12 +49,12 @@
 # astro.body_from_name(name)          Given a name, return the exact object from api (eaiser to compare than planet[name])
 # astro.time_to_local_datetime(Time)  Convert Time object to a datetime in local timezone (no timezone info)
 # astro.pos_to_consteallation(pos)    Given a position, return a short string for the contellation name
-# astro.info(target, obsv, pos_only=False, T=now)  Return a dictionary of info about the body's pos, rise/set, etc. in local time
-# astro.print_planets(obsv, pos_only=False, T=Now) Print out an ephemeris, short or long
+# astro.info(target, observer, pos_only=False, T=now)  Return a dictionary of info about the body's pos, rise/set, etc. in local time
+# astro.print_planets(observer, pos_only=False, T=Now) Print out an ephemeris, short or long
 # astro.risings_and_settings(ephemeris, target, topos, horizon, radius)  Calc rise/set for any body
 
 
-import math
+import math, calendar
 from skyfield import api, almanac
 from skyfield.api import Star
 from skyfield.data import hipparcos
@@ -108,20 +105,19 @@ def pos_to_constellation(pos):
 
 # From: https://github.com/skyfielders/python-skyfield/blob/master/skyfield/almanac.py
 def risings_and_settings(ephemeris, target, observer, horizon=-0.3333, radius=0):
-    topos_at = (observer).at
     h = horizon - radius
 
     def is_body_up_at(t):
         t._nutation_angles = iau2000b(t.tt)
-        return topos_at(t).observe(target).apparent().altaz()[0].degrees > h
+        return observer.at(t).observe(target).apparent().altaz()[0].degrees > h
     is_body_up_at.rough_period = 0.5  # twice a day
     return is_body_up_at
 
 
 # From https://github.com/skyfielders/python-skyfield/issues/243
-def culmination(body, obsv, t):
+def culmination(body, obsverver, t):
     def f(t):
-        alt, _az, _distance = obsv.at(t).observe(body).apparent().altaz()
+        alt, _az, _distance = obsverver.at(t).observe(body).apparent().altaz()
         return alt.degrees
     f.rough_period = 1.0
 
@@ -149,7 +145,7 @@ def time_to_local_datetime(t):
     return local_time
 
 
-# Observe a target body from an obsv body or Topo and return info.
+# Observe a target body from an observer body or Topo and return info.
 # If pos_only is omitted or False, return:
 # name, alt, azm, dist, rising, culmination, setting, culmatl, illum, const for a target body
 # alt, azm and culmalt are in decimal degrees
@@ -162,11 +158,11 @@ def time_to_local_datetime(t):
 #
 # If t is a skyfield Time object, use that for calcuation. If t is None, use now()/
 #
-def info(target, obsv, pos_only=False, t=None):
+def info(target, observer, pos_only=False, t=None):
     ROUNDING = 3
     if t is None:    t = now()
     name           = name_from_body(target)
-    astrometric    = obsv.at(t).observe(target)
+    astrometric    = observer.at(t).observe(target)
     apparent       = astrometric.apparent()
     const          = pos_to_constellation(apparent)
     alt, azm, dist = apparent.altaz('standard')
@@ -191,8 +187,8 @@ def info(target, obsv, pos_only=False, t=None):
     ta, ya = almanac.find_discrete(
                 day_start(t),
                 day_end(t),
-                risings_and_settings(planets, target, obsv, radius=rad))
-    culm_time, culm_alt = culmination(target, obsv, t)
+                risings_and_settings(planets, target, observer, radius=rad))
+    culm_time, culm_alt = culmination(target, observer, t)
     for yi, ti in zip(ya, ta):
         if yi:
             rise_time = ti
@@ -203,12 +199,13 @@ def info(target, obsv, pos_only=False, t=None):
     return name, alt, azm, dist, rise_time, culm_time, set_time, culm_alt, illum, const
 
 
-# Given an obsv body or Topo (example: home_pos), print an ephemeris to stdout. If pos_only, then just alt, azm and distance are printed.
+# Given an observer body or Topo (example: home_pos), print an ephemeris to stdout.
+# If pos_only, then just alt, azm and distance are printed.
 # If not pos_only (the default) all info from astro.info is included.
 # Special allowances are made for Sun and Moon.
 # If t is a skyfield Time object, use that for calcuation. If t is None, use now()
 #
-def print_planets(obsv, pos_only=False, t=None):
+def print_planets(observer, pos_only=False, t=None):
     if t is None:
         t = now()
     def print_title(pos_only):
@@ -228,7 +225,7 @@ def print_planets(obsv, pos_only=False, t=None):
             print('-------  ------  ------  -----  --------  --------  --------   ------  -----  -------------')
     def print_body(body, pos_only):
         if pos_only:
-            name, alt, azm, dist, illum = info(body, obsv, True, t)
+            name, alt, azm, dist, illum = info(body, observer, True, t)
             print('{0:7s}  {1:6.2f}  {2:6.2f}  {3:13,}'.format(
                 name,
                 alt,
@@ -236,7 +233,7 @@ def print_planets(obsv, pos_only=False, t=None):
                 int(dist)
             ))
         else:
-            name, alt, azm, dist, rise_time, culm_time, set_time, culm_alt, illum, const = info(body, obsv, False, t)
+            name, alt, azm, dist, rise_time, culm_time, set_time, culm_alt, illum, const = info(body, observer, False, t)
             if illum is None:
                 illum = 100.0
             print('{0:7s}  {1:6.2f}  {2:6.2f}  {3:5s}  {4:8s}  {5:8s}  {6:8s}  {7:7.2f}  {8:5.1f}  {9:13,}'.format(
@@ -261,35 +258,31 @@ def now():
     return ts.now()
 
 
-# def this_year():
-#     now = datetime.now()
-#     return now.year
+def year_start(t):
+    dt = time_to_local_datetime(t)
+    dt = dt.replace(month=1, day=1, hour=0, minute=0, second=0)
+    return ts.utc(dt)
 
 
-# def this_month():
-#     now = datetime.now()
-#     return now.month
+def year_end(t):
+    dt = time_to_local_datetime(t)
+    dt = dt.replace(month=12, day=31, hour=23, minute=59, second=59)
+    return ts.utc(dt)
 
 
-# def this_day():
-#     now = datetime.now()
-#     return now.day
+def month_start(t):
+    dt = time_to_local_datetime(t)
+    dt = dt.replace(day=1, hour=0, minute=0, second=0)
+    return ts.utc(dt)
 
 
-# def year_start():
-#     return ts.utc(datetime(this_year(), 1, 1, 0, 0, 0).astimezone(tz=timezone.utc))
-
-
-# def year_end():
-#     return ts.utc(datetime(this_year(), 12, 31, 23, 59, 59).astimezone(tz=timezone.utc))
-
-
-# def month_start():
-#     return ts.utc(datetime(this_year(), this_month(), 1, 0, 0, 0).astimezone(tz=timezone.utc))
-
-
-# def month_end():
-#     return ts.utc(datetime(this_year(), this_month(), 31, 23, 59, 59).astimezone(tz=timezone.utc))
+def month_end(t):
+    dt = time_to_local_datetime(t)
+    md = [31, 28, 31, 30, 31, 31, 30, 31, 30, 31, 30, 31]
+    if calendar.isleap(dt.year): md[1] += 1
+    ld = md[dt.month]
+    dt = dt.replace(day=ld, hour=23, minute=59, second=59)
+    return ts.utc(dt)
 
 
 def day_start(t):
