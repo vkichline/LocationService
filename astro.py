@@ -139,9 +139,6 @@ def culmination(body, obsv, t):
         t   = time_to_local_datetime(times[0])
         alt = maxima[0]
         return (t, alt)
-    # except Exception as ex:
-    #     if body != moon:
-    #         print('Culmination: %s : %s -> %s' % (ex, time_to_local_datetime(t0), time_to_local_datetime(t1)))
     except:
         return None, None
 
