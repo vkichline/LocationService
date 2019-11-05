@@ -35,16 +35,16 @@
 # astro.home_topo      Topocentric location of my house (without earth vector)
 # astro.home_loc       Topocentric location of my house (with earth vector added)
 # astro.now()          Time object represeting moment the function is called
-# astro.this_year()    Integer for this year (local time)
-# astro.this_month()   Integer for this month (local time)
-# astro.this_day()     Integer for this day (local time)
-# astro.year_start()   Time object for the first moment of this local year, converted to UTC
-# astro.year_end()     Time object for the last moment of this local year, converted to UTC
-# astro.month_start()  Time object for the first moment of this local month, converted to UTC
-# astro.month_end()    Time object for the last moment of this local month, converted to UTC
-# astro.day_start()    Time object for the first moment of this local day, converted to UTC
-# astro.day_noon()     Time object for noon of this local day, converted to UTC
-# astro.day_end()      Time object for the last moment of this local day, converted to UTC
+## astro.this_year()    Integer for this year (local time)
+## astro.this_month()   Integer for this month (local time)
+## astro.this_day()     Integer for this day (local time)
+## astro.year_start()   Time object for the first moment of this local year, converted to UTC
+## astro.year_end()     Time object for the last moment of this local year, converted to UTC
+## astro.month_start()  Time object for the first moment of this local month, converted to UTC
+## astro.month_end()    Time object for the last moment of this local month, converted to UTC
+# astro.day_start(t)   Time object for the first moment of the day of the time provided
+# astro.day_noon(t)    Time object for noon of of the time provided
+# astro.day_end(t)     Time object for the last moment of of the time provided
 # astro.format_dt(dt)  Format a DateTime object consistangly; date, then time.
 # astro.topo_from_data(lat, lon, alt) Get a Topo object set to the current GPS location
 # astro.loc_from_data(lat, lon, alt)  Get a Location object set to the current GPS location on the surface of the Earth
@@ -190,8 +190,11 @@ def info(target, obsv, pos_only=False, t=None):
         rad = 0.5
     else:
         rad = 0.0
-    ta, ya = almanac.find_discrete(day_start(), day_end(),
-                                 risings_and_settings(planets, target, obsv, radius=rad))
+    
+    ta, ya = almanac.find_discrete(
+                day_start(t),
+                day_end(t),
+                risings_and_settings(planets, target, obsv, radius=rad))
     culm_time, culm_alt = culmination(target, obsv, t)
     for yi, ti in zip(ya, ta):
         if yi:
@@ -261,47 +264,52 @@ def now():
     return ts.now()
 
 
-def this_year():
-    now = datetime.now()
-    return now.year
+# def this_year():
+#     now = datetime.now()
+#     return now.year
 
 
-def this_month():
-    now = datetime.now()
-    return now.month
+# def this_month():
+#     now = datetime.now()
+#     return now.month
 
 
-def this_day():
-    now = datetime.now()
-    return now.day
+# def this_day():
+#     now = datetime.now()
+#     return now.day
 
 
-def year_start():
-    return ts.utc(datetime(this_year(), 1, 1, 0, 0, 0).astimezone(tz=timezone.utc))
+# def year_start():
+#     return ts.utc(datetime(this_year(), 1, 1, 0, 0, 0).astimezone(tz=timezone.utc))
 
 
-def year_end():
-    return ts.utc(datetime(this_year(), 12, 31, 23, 59, 59).astimezone(tz=timezone.utc))
+# def year_end():
+#     return ts.utc(datetime(this_year(), 12, 31, 23, 59, 59).astimezone(tz=timezone.utc))
 
 
-def month_start():
-    return ts.utc(datetime(this_year(), this_month(), 1, 0, 0, 0).astimezone(tz=timezone.utc))
+# def month_start():
+#     return ts.utc(datetime(this_year(), this_month(), 1, 0, 0, 0).astimezone(tz=timezone.utc))
 
 
-def month_end():
-    return ts.utc(datetime(this_year(), this_month(), 31, 23, 59, 59).astimezone(tz=timezone.utc))
+# def month_end():
+#     return ts.utc(datetime(this_year(), this_month(), 31, 23, 59, 59).astimezone(tz=timezone.utc))
 
 
-def day_start():
-    return ts.utc(datetime(this_year(), this_month(), this_day(), 0, 0, 0).astimezone(tz=timezone.utc))
+def day_start(t):
+    dt = time_to_local_datetime(t)
+    dt = dt.replace(hour=0, minute=0, second=0)
+    return ts.utc(dt)
+
+def day_noon(t):
+    dt = time_to_local_datetime(t)
+    dt = dt.replace(hour=12, minute=0, second=0)
+    return ts.utc(dt)
 
 
-def day_noon():
-    return ts.utc(datetime(this_year(), this_month(), this_day(), 12, 0, 0).astimezone(tz=timezone.utc))
-
-
-def day_end():
-    return ts.utc(datetime(this_year(), this_month(), this_day(), 23, 59, 59).astimezone(tz=timezone.utc))
+def day_end(t):
+    dt = time_to_local_datetime(t)
+    dt = dt.replace(hour=23, minute=59, second=59)
+    return ts.utc(dt)
 
 
 def format_dt(dt):
