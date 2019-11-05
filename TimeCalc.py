@@ -35,7 +35,23 @@ class TimeCalc:
     def getTimeZoneName(self):
         if '' == self.tzName:
             # Set tzName to string or None; do only once.
-            self.tzName = self.finder.timezone_at(lat=self.lat, lng=self.lon)
+            tzName = self.finder.timezone_at(lat=self.lat, lng=self.lon)
+            if tzName is None:
+                # Per https://en.wikipedia.org/wiki/Tz_database#Area
+                # Generic timezones are in the Etc/ Area, and have thier signs reversed.
+                # zones west of GMT have a positive sign and those east have a negative
+                # sign in their name (e.g "Etc/GMT-14" is 14 hours ahead of GMT).
+                part = -int(self.lon/15)
+                assert(-12 <= part <= 12)
+                #print(self.lon, part)
+                if not part:
+                    tzName = 'Etc/GMT'
+                else:
+                    if part > 0:
+                        tzName = 'Etc/GMT+' + str(part)
+                    else:
+                        tzName = 'Etc/GMT' + str(part)
+            self.tzName = tzName
         return self.tzName
 
     def getDOY(self, dt):
@@ -46,14 +62,7 @@ class TimeCalc:
         return self.utc
 
     def getLocalTime(self):
-        # Use getTimeZoneName to initialize or regenerate tzName
-        tzname = self.getTimeZoneName()
-        tz = None
-        if tzname is None:
-            # TODO: fallback plan
-            pass
-        else:
-            tz = pytz.timezone(self.getTimeZoneName())
+        tz = pytz.timezone(self.getTimeZoneName())
         return self.utc.astimezone(tz)
 
     def getJDate(self):
