@@ -56,7 +56,7 @@
 # astro.risings_and_settings(ephemeris, target, topos, horizon, radius)  Calc rise/set for any body
 
 
-import math, calendar, TimeCalc
+import math, logging, calendar, TimeCalc
 from skyfield             import api, almanac
 from skyfield.api         import Star
 from skyfield.data        import hipparcos
@@ -65,10 +65,14 @@ from datetime             import datetime, timezone, timedelta
 from math                 import radians, cos, sin, asin, sqrt
 
 
-LOAD_HIPPARCOS  = False  # TODO: Should be a function of cmd line param
+LOAD_HIPPARCOS  = False
 TIME_ZONE_DIST  = 1.0    # How many miles location much change to recalc timezone.
+LOG_LEVEL       = logging.INFO
+
 data_dir        = '/usr/local/share/skyfield/data'
 _time_calc      = None  # Access through get_TimeCalc. Instance is cached. Use change_location freely.
+
+logging.basicConfig(format='%(levelname)s:%(message)s', level=LOG_LEVEL)
 
 
 def haversine(lat1, lon1, lat2, lon2, metric=False):
@@ -100,13 +104,16 @@ def get_TimeCalc(lat, lon, t=None):
         # change if greater, leave as is for less.
         # TODO: distance should be a settings.  Need -force param.
         # TODO: should this calc move to TimeCalc?
-        dist = haversine(lat, lon, _time_calc.lat, _time_calc.lon)
-        if TIME_ZONE_DIST < dist:
-            # TODO: use logging
-            # print('Changing TimeCalc loc because distance is %s' % dist)
-            _time_calc.change_location(lat, lon)
-        # else:
-        #     print('Keeping cached location because distance change is %s' % dist)
+        # lat/lon may be identical, call after call, optimize for this
+        if lat != _time_calc.lat or lon != _time_calc.lon:
+            # If there's a change, it may be jitter, or too small to matter.
+            dist = haversine(lat, lon, _time_calc.lat, _time_calc.lon)
+            if TIME_ZONE_DIST < dist:
+                logging.debug('Changing TimeCalc loc because distance is %s', dist)
+                _time_calc.change_location(lat, lon)
+            else:
+                logging.debug('Keeping cached location because distance change is %s', dist)
+                pass
         _time_calc.change_time(t.utc_datetime())
     return _time_calc
 
@@ -371,15 +378,15 @@ def loc_from_data(lat, lon, alt):
 
 
 if '__main__' == __name__:
-    print('Loading timescale.')
+    logging.info('Loading timescale.')
     loader = api.Loader(data_dir, expire=True, verbose=True)
     data_downloaded = True
     # This is quite intense on a RPi Zero, should be a cmd line flag:
     if LOAD_HIPPARCOS:
         with loader.open(hipparcos.URL) as f:
-            print('Loading Hipparcos catalog')
+            logging.info('Loading Hipparcos catalog')
             df = hipparcos.load_dataframe(f)
-    print(loader.log)
+    logging.info('%s', loader.log)
 else:
     # verbose displays progress bar when downloading
     loader = api.Loader(data_dir, expire=False, verbose=False)
@@ -388,7 +395,7 @@ else:
 try:
     ts    = loader.timescale()
 except:
-    print('Error loading timescale. Falling back on builtin timescale.')
+    logging.warning('Error loading timescale. Falling back on builtin timescale.')
     ts    = loader.timescale(builtin=True)
 planets   = loader('de421.bsp')
 sun       = planets['sun']
