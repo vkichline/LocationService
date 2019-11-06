@@ -60,15 +60,15 @@ class DayCalc:
     def __init__(self, latitude, longitude, altitude=0, dt=None):
         logging.debug('DayCalc ctor: %s, %s, %s, %s', latitude, longitude, altitude, dt)
         logging.debug('%s, %s, %s, %s', type(latitude), type(longitude), type(altitude), type(dt))
+        self.topo = a.api.Topos(latitude, longitude, elevation_m=altitude)
+        self.loc  = a.earth + self.topo
         if dt is None:
-            self.DATE = a.time_to_local_datetime(a.now())
+            self.DATE = a.time_to_local_datetime(a.now(), self.loc)
         else:
             self.DATE = dt # Local time, with time offset
         self.LAT  = latitude
         self.LON  = longitude
         self.ALT  = altitude
-        self.topo = a.api.Topos(latitude, longitude, elevation_m=altitude)
-        self.loc  = self.topo + a.earth
         self.init_data()
 
     def init_data(self):
@@ -96,7 +96,7 @@ class DayCalc:
     
     def calc_offset(self):
         ta = a.ts.utc(self.DATE.year, self.DATE.month, self.DATE.day, 0, 0, 0)
-        tl = a.time_to_local_datetime(ta)
+        tl = a.time_to_local_datetime(ta, self.loc)
         self.offset = 24 - tl.hour
         logging.debug('Offset: %s', self.offset)
 
@@ -121,21 +121,21 @@ class DayCalc:
         t1        = a.ts.utc(self.DATE.year, self.DATE.month, self.DATE.day, 23 + self.offset, 59, 59)
         t, y      = a.almanac.find_discrete(t0, t1, a.risings_and_settings(a.planets, body, self.loc, radius=0.5))
         rise_time = set_time = None
-        assert(0 == a.time_to_local_datetime(t0).time().hour)
+        assert(0 == a.time_to_local_datetime(t0, self.loc).time().hour)
         for yi, ti in zip(y, t):
             if yi:
-                rise_time = a.time_to_local_datetime(ti)
+                rise_time = a.time_to_local_datetime(ti, self.loc)
             else:
-                set_time  = a.time_to_local_datetime(ti)
+                set_time  = a.time_to_local_datetime(ti, self.loc)
         return rise_time, set_time
 
     def calc_all(self):
         times, _kinds = self.twilight(self.ASTRONOMICAL_TWILIGHT)
-        self.BMAT, self.EEAT    = a.time_to_local_datetime(times[0]), a.time_to_local_datetime(times[1])
+        self.BMAT, self.EEAT    = a.time_to_local_datetime(times[0], self.loc), a.time_to_local_datetime(times[1], self.loc)
         times, _kinds = self.twilight(self.NAUTICAL_TWILIGHT)
-        self.BMNT, self.EENT    = a.time_to_local_datetime(times[0]), a.time_to_local_datetime(times[1])
+        self.BMNT, self.EENT    = a.time_to_local_datetime(times[0], self.loc), a.time_to_local_datetime(times[1], self.loc)
         times, _kinds = self.twilight(self.CIVIL_TWILIGHT)
-        self.BMCT, self.EECT    = a.time_to_local_datetime(times[0]), a.time_to_local_datetime(times[1])
+        self.BMCT, self.EECT    = a.time_to_local_datetime(times[0], self.loc), a.time_to_local_datetime(times[1], self.loc)
         self.SCUL, self.SCALT   = a.culmination(a.sun,  self.loc, a.ts.utc(self.DATE))
         self.LCUL, self.LCALT   = a.culmination(a.moon, self.loc, a.ts.utc(self.DATE))
         self.SRISE, self.SSET   = self.rise_and_set(a.sun)
@@ -233,6 +233,7 @@ class DayCalc:
         ))
 
 if '__main__' == __name__:
-    t      = a.time_to_local_datetime(a.now())
-    tester = DayCalc(a.home_topo.latitude.degrees, a.home_topo.longitude.degrees, a.home_topo.elevation.m, t)	
+    lat, lon = a.lat_lon_from_observer(a.home_loc)
+    t      = a.time_to_local_datetime(a.now(), a.home_loc)
+    tester = DayCalc(lat, lon, a.home_topo.elevation.m, t)	
     tester.print_report()

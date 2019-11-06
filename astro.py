@@ -35,21 +35,21 @@
 # astro.home_topo      Topocentric location of my house (without earth vector)
 # astro.home_loc       Topocentric location of my house (with earth vector added)
 # astro.now()          Time object represeting moment the function is called
-# astro.year_start(t)  Time object for the first moment of the year of the time provided
-# astro.year_end(t)    Time object for the last moment of the year of the time provided
-# astro.month_start(t) Time object for the first moment of the month of the time provided
-# astro.month_end(t)   Time object for the last moment of the month of the time provided
-# astro.day_start(t)   Time object for the first moment of the day of the time provided
-# astro.day_noon(t)    Time object for noon of of the time provided
-# astro.day_end(t)     Time object for the last moment of of the time provided
 # astro.format_dt(dt)  Format a DateTime object consistangly; date, then time.
+# astro.year_start(t, observer)  Time object for the first moment of the year of the time provided
+# astro.year_end(t, observer)    Time object for the last moment of the year of the time provided
+# astro.month_start(t, observer) Time object for the first moment of the month of the time provided
+# astro.month_end(t, observer)   Time object for the last moment of the month of the time provided
+# astro.day_start(t, observer)   Time object for the first moment of the day of the time provided
+# astro.day_noon(t, observer)    Time object for noon of of the time provided
+# astro.day_end(t, observer)     Time object for the last moment of of the time provided
 # astro.topo_from_data(lat, lon, alt) Get a Topo object set to the current GPS location
 # astro.loc_from_data(lat, lon, alt)  Get a Location object set to the current GPS location on the surface of the Earth
 # astro.name_from_body(body)          Given one of the planet objects above, return its name
 # astro.body_from_name(name)          Given a name, return the exact object from api (eaiser to compare than planet[name])
-# astro.time_to_local_datetime(Time)  Convert Time object to a datetime in local timezone (no timezone info)
 # astro.pos_to_consteallation(pos)    Given a position, return a short string for the contellation name
 # astro.get_TimeCalc(lat, lon, t=None)  Reuse a cached  TimeCalc object.
+# astro.time_to_local_datetime(Time, Observer)  Convert Time object to a datetime in local timezone using Observer location
 # astro.info(target, observer, pos_only=False, T=now)   Return a dictionary of info about the body's pos, rise/set, etc. in local time
 # astro.print_planets(observer, pos_only=False, T=Now)  Print out an ephemeris, short or long
 # astro.haversine(lat1, lon1, lat2, lon2, metric=False) Calc didtance between points on earth's surface.
@@ -102,10 +102,11 @@ def get_TimeCalc(lat, lon, t=None):
         # TODO: should this calc move to TimeCalc?
         dist = haversine(lat, lon, _time_calc.lat, _time_calc.lon)
         if TIME_ZONE_DIST < dist:
-            print('Changing TimeCalc loc because distance is %s' % dist)
+            # TODO: use logging
+            # print('Changing TimeCalc loc because distance is %s' % dist)
             _time_calc.change_location(lat, lon)
-        else:
-            print('Keeping cached location because distance change is %s' % dist)
+        # else:
+        #     print('Keeping cached location because distance change is %s' % dist)
         _time_calc.change_time(t.utc_datetime())
     return _time_calc
 
@@ -158,34 +159,44 @@ def risings_and_settings(ephemeris, target, observer, horizon=-0.3333, radius=0)
 
 
 # From https://github.com/skyfielders/python-skyfield/issues/243
-def culmination(body, obsverver, t):
+def culmination(body, observer, t):
     def f(t):
-        alt, _az, _distance = obsverver.at(t).observe(body).apparent().altaz()
+        alt, _az, _distance = observer.at(t).observe(body).apparent().altaz()
         return alt.degrees
     f.rough_period = 1.0
 
     dt   = t.utc_datetime()
     # Determine time offset for the day (TODO: may be 1 hour off on DST change dates)
     ta = ts.utc(dt.year, dt.month, dt.day, 0, 0, 0)
-    tl = time_to_local_datetime(ta)
+    tl = time_to_local_datetime(ta, observer)
     offset = 24 - tl.hour
 
     t0   = ts.utc(dt.year, dt.month, dt.day,  offset,  0,  0)
     t1   = ts.utc(dt.year, dt.month, dt.day, 23 + offset, 59, 59)
-    assert(0 == time_to_local_datetime(t0).time().hour)
+    assert(0 == time_to_local_datetime(t0, observer).time().hour)
     try:
         times, maxima = almanac._find_maxima(t0, t1, f, epsilon=0.000001) # tuned to avoid exceptions
-        t   = time_to_local_datetime(times[0])
+        t   = time_to_local_datetime(times[0], observer)
         alt = maxima[0]
         return (t, alt)
     except:
         return None, None
 
 
-def time_to_local_datetime(t):
-    utc_time = t.utc_datetime()
-    local_time = utc_time.replace(tzinfo=timezone.utc).astimezone(tz=None)
-    return local_time
+def lat_lon_from_observer(observer):
+    """observer is like: earth + Topos(lat, lon, alt)"""
+    lat = observer.positives[-1].latitude.degrees
+    lon = observer.positives[-1].longitude.degrees
+    assert(-90 <= lat <= 90)
+    assert(-180 <= lon <= 180)
+    return lat, lon
+
+
+def time_to_local_datetime(t, observer):
+    """Using the location embedded in the observer object, calculate local time from Time object (utc)."""
+    lat, lon = lat_lon_from_observer(observer)
+    tc = get_TimeCalc(lat, lon, t)
+    return tc.getLocalTime()
 
 
 # Observe a target body from an observer body or Topo and return info.
@@ -228,8 +239,8 @@ def info(target, observer, pos_only=False, t=None):
         rad = 0.0
     
     ta, ya = almanac.find_discrete(
-                day_start(t),
-                day_end(t),
+                day_start(t, observer),
+                day_end(t, observer),
                 risings_and_settings(planets, target, observer, radius=rad))
     culm_time, culm_alt = culmination(target, observer, t)
     rise_time = set_time = None
@@ -238,8 +249,8 @@ def info(target, observer, pos_only=False, t=None):
             rise_time = ti
         else:
             set_time = ti
-    rise_time = None if rise_time is None else time_to_local_datetime(rise_time)
-    set_time  = None if set_time  is None else time_to_local_datetime(set_time)
+    rise_time = None if rise_time is None else time_to_local_datetime(rise_time, observer)
+    set_time  = None if set_time  is None else time_to_local_datetime(set_time, observer)
     return name, alt, azm, dist, rise_time, culm_time, set_time, culm_alt, illum, const
 
 
@@ -253,10 +264,10 @@ def print_planets(observer, pos_only=False, t=None):
     if t is None:
         t = now()
     def print_title(pos_only):
-        dt = time_to_local_datetime(t)
+        dt = time_to_local_datetime(t, observer)
         print('%s for %s from latitude %.4f, longitude %.4f at %s local time.' % (
             'Fast data' if pos_only else 'Data',
-            time_to_local_datetime(t).date(),
+            time_to_local_datetime(t, observer).date(),
             home_topo.latitude.degrees,
             home_topo.longitude.degrees,
             dt.strftime('%H:%M:%S')))
@@ -298,39 +309,30 @@ def print_planets(observer, pos_only=False, t=None):
         print_body(body, pos_only)
 
 
-def lat_lon_from_observer(observer):
-    """observer is like: earth + Topos(lat, lon, alt)"""
-    lat = observer.positives[-1].latitude.degrees
-    lon = observer.positives[-1].longitude.degrees
-    assert(-90 <= lat <= 90)
-    assert(-180 <= lon <= 180)
-    return lat, lon
-
-
 def now():
     return ts.now()
 
 
-def year_start(t):
-    dt = time_to_local_datetime(t)
+def year_start(t, observer):
+    dt = time_to_local_datetime(t, observer)
     dt = dt.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
     return ts.utc(dt)
 
 
-def year_end(t):
-    dt = time_to_local_datetime(t)
+def year_end(t, observer):
+    dt = time_to_local_datetime(t, observer)
     dt = dt.replace(month=12, day=31, hour=23, minute=59, second=59, microsecond=999999)
     return ts.utc(dt)
 
 
-def month_start(t):
-    dt = time_to_local_datetime(t)
+def month_start(t, observer):
+    dt = time_to_local_datetime(t, observer)
     dt = dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     return ts.utc(dt)
 
 
-def month_end(t):
-    dt = time_to_local_datetime(t)
+def month_end(t, observer):
+    dt = time_to_local_datetime(t, observer)
     md = [31, 28, 31, 30, 31, 31, 30, 31, 30, 31, 30, 31]
     if calendar.isleap(dt.year): md[1] += 1
     ld = md[dt.month]
@@ -338,19 +340,19 @@ def month_end(t):
     return ts.utc(dt)
 
 
-def day_start(t):
-    dt = time_to_local_datetime(t)
+def day_start(t, observer):
+    dt = time_to_local_datetime(t, observer)
     dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
     return ts.utc(dt)
 
-def day_noon(t):
-    dt = time_to_local_datetime(t)
+def day_noon(t, observer):
+    dt = time_to_local_datetime(t, observer)
     dt = dt.replace(hour=12, minute=0, second=0, microsecond=0)
     return ts.utc(dt)
 
 
-def day_end(t):
-    dt = time_to_local_datetime(t)
+def day_end(t, observer):
+    dt = time_to_local_datetime(t, observer)
     dt = dt.replace(hour=23, minute=59, second=59, microsecond=999999)
     return ts.utc(dt)
 
