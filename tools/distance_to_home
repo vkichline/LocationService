@@ -1,0 +1,36 @@
+#!/usr/bin/python
+
+# From https://stackoverflow.com/questions/4913349/haversine-formula-in-python-bearing-and-distance-between-two-gps-points
+
+import sys
+from math import radians, cos, sin, asin, sqrt
+
+def haversine(lon1, lat1, lon2, lat2):
+    """
+    Calculate the great circle distance between two points 
+    on the earth (specified in decimal degrees)
+    """
+    # convert decimal degrees to radians 
+    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+
+    # haversine formula 
+    dlon = lon2 - lon1 
+    dlat = lat2 - lat1 
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * asin(sqrt(a)) 
+    r = 6371 # Radius of earth in kilometers. Use 3956 for miles
+    return c * r
+
+def usage():
+    print('distance lat lon')
+    exit(0)
+
+if __name__ == '__main__':
+    home_lon = -122.18015189
+    home_lat = 47.725458897
+
+    pc = len(sys.argv)
+    if 3 != pc:
+        usage()
+    dist = haversine(home_lon, home_lat, float(sys.argv[2]), float(sys.argv[1]))
+    print("You are %.3f miles from home." % (dist * 0.6213712))
