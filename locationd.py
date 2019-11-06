@@ -23,7 +23,7 @@
 
 # Load the settings dictionary and access settings as: cfg.get['KEY']
 import configuration as cfg
-import time, signal, threading, json, datetime, os, socket, sys, math, logging, astro, TimeCalc, DayCalc
+import time, signal, threading, json, datetime, os, socket, sys, math, logging, astro, DayCalc
 
 logging.basicConfig(format='%(levelname)s:%(message)s', level=cfg.locationd['LOGGING_LEVEL'])
 logging.info('Configuration file loaded. Logging level: %s', cfg.locationd['LOGGING_LEVEL'])
@@ -213,8 +213,8 @@ def get_day_info():
 # Return JSON representing TimeCalc info
 def get_time_info():
     update_state()
-    tcalc              = TimeCalc.TimeCalc(state['lat'], state['lon'])
     result             = {}
+    tcalc              = astro.get_TimeCalc(state['lat'], state['lon'])
     result['utc']      = tcalc.getUtcTime().strftime('%H:%M:%S')
     result['local']    = tcalc.getLocalTime().strftime('%H:%M:%S')
     result['solar']    = tcalc.getSolarTime().strftime('%H:%M:%S')

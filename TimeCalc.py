@@ -25,12 +25,16 @@ class TimeCalc:
         self.lat     = float(lat)
         self.lon     = float(lon)
         self.finder  = TimezoneFinder()
-        self.tzName  = ''  # Compute the name on demand. None if uncomputable
+        self.tzName  = ''  # Compute the name on demand.
     
     def change_location(self, lat, lon):
         self.lat     = float(lat)
         self.lon     = float(lon)
-        self.tzName  = ''  # Compute the name on demand. None if uncomputable
+        self.tzName  = ''  # Compute the name on demand.
+    
+    def change_time(self, utc):
+        self.utc     = utc
+        self.t       = a.ts.utc(utc)
 
     def getTimeZoneName(self):
         if '' == self.tzName:

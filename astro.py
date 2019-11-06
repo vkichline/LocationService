@@ -49,12 +49,13 @@
 # astro.body_from_name(name)          Given a name, return the exact object from api (eaiser to compare than planet[name])
 # astro.time_to_local_datetime(Time)  Convert Time object to a datetime in local timezone (no timezone info)
 # astro.pos_to_consteallation(pos)    Given a position, return a short string for the contellation name
+# astro.get_TimeCalc(lat, lon, t=None)  Reuse a cached TimeCalc object.
 # astro.info(target, observer, pos_only=False, T=now)  Return a dictionary of info about the body's pos, rise/set, etc. in local time
 # astro.print_planets(observer, pos_only=False, T=Now) Print out an ephemeris, short or long
 # astro.risings_and_settings(ephemeris, target, topos, horizon, radius)  Calc rise/set for any body
 
 
-import math, calendar
+import math, calendar, TimeCalc
 from skyfield import api, almanac
 from skyfield.api import Star
 from skyfield.data import hipparcos
@@ -64,6 +65,23 @@ from datetime import datetime, timezone, timedelta
 
 LOAD_HIPPARCOS  = False  # TODO: Should be a function of cmd line param
 data_dir        = '/usr/local/share/skyfield/data'
+
+_time_calc      = None  # Access through get_TimeCalc. Instance is cached. Use change_location freely.
+
+
+# t is a skyfield Time object, lat and lon are degrees in floats
+def get_TimeCalc(lat, lon, t=None):
+    global _time_calc
+    if t is None: t = now()
+    if _time_calc is None:
+        _time_calc = TimeCalc.TimeCalc(lat, lon, t.utc_datetime())
+    else:
+        # Don't change location unless needed. Timezone is cached.
+        # TODO: Should see if lat and lon are reasonably close.
+        if lat != _time_calc.lat or lon != _time_calc.lon:
+            _time_calc.change_location(lat, lon)
+        _time_calc.change_time(t)
+    return _time_calc
 
 
 def name_from_body(body):
