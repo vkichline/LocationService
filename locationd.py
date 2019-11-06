@@ -23,7 +23,7 @@
 
 # Load the settings dictionary and access settings as: cfg.get['KEY']
 import configuration as cfg
-import time, signal, threading, json, datetime, os, socket, sys, math, logging, astro, DayCalc
+import time, signal, threading, json, datetime, os, socket, sys, math, logging, astro, DayCalc, traceback
 
 logging.basicConfig(format='%(levelname)s:%(message)s', level=cfg.locationd['LOGGING_LEVEL'])
 logging.info('Configuration file loaded. Logging level: %s', cfg.locationd['LOGGING_LEVEL'])
@@ -310,4 +310,6 @@ if __name__ == '__main__':
     except Exception as ex:
         logging.critical('locationd is shutting down due to an exception.')
         logging.critical('Exception: %s', ex)
+        tb = traceback.format_exc()
+        logging.critical('Stack Trace: %s', tb)
         shutdown()

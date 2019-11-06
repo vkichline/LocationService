@@ -80,7 +80,7 @@ def get_TimeCalc(lat, lon, t=None):
         # TODO: Should see if lat and lon are reasonably close.
         if lat != _time_calc.lat or lon != _time_calc.lon:
             _time_calc.change_location(lat, lon)
-        _time_calc.change_time(t)
+        _time_calc.change_time(t.utc_datetime())
     return _time_calc
 
 
