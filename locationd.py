@@ -59,12 +59,13 @@ class GpsPoller(threading.Thread):
         self.session = None
         try:
             threading.Thread.__init__(self)
-            self.session  = gps.gps(mode=WATCH_ENABLE)
+            self.session  = gps.gps(mode=gps.WATCH_ENABLE)
             self.watching = True
             logging.info('GPS monitoring started.')
-        except:
+        except Exception as ex:
             self.watching = False
             logging.warning('Failed to open GPS stream. Falling back on cached values.')
+            logging.warning('%s', ex)
 
     def value(self):
         return self.current_value
