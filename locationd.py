@@ -75,6 +75,7 @@ class GpsPoller(threading.Thread):
                 report = self.session.next()
                 if report['class'] == 'TPV':
                     self.current_value = self.session.next()
+                    # TODO: we should check regularly, once an hour or so (configurable)
                     if not self.system_time_has_been_set:
                         self.check_set_system_time(report)
             except:

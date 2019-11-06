@@ -298,6 +298,15 @@ def print_planets(observer, pos_only=False, t=None):
         print_body(body, pos_only)
 
 
+def lat_lon_from_observer(observer):
+    """observer is like: earth + Topos(lat, lon, alt)"""
+    lat = observer.positives[-1].latitude.degrees
+    lon = observer.positives[-1].longitude.degrees
+    assert(-90 <= lat <= 90)
+    assert(-180 <= lon <= 180)
+    return lat, lon
+
+
 def now():
     return ts.now()
 
