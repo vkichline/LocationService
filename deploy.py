@@ -11,6 +11,8 @@ echo Deploying service control file
 sudo cp info/locationd.service /etc/systemd/system/locationd.service
 
 echo Deploying locationd content
+# create directory if needed
+sudo mkdir                     /usr/local/lib/locationd
 sudo cp locationd.py           /usr/local/lib/locationd/locationd.py
 sudo cp configuration.py       /usr/local/lib/locationd/configuration.py
 sudo cp astro.py               /usr/local/lib/locationd/astro.py
