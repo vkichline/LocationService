@@ -49,24 +49,43 @@
 # astro.body_from_name(name)          Given a name, return the exact object from api (eaiser to compare than planet[name])
 # astro.time_to_local_datetime(Time)  Convert Time object to a datetime in local timezone (no timezone info)
 # astro.pos_to_consteallation(pos)    Given a position, return a short string for the contellation name
-# astro.get_TimeCalc(lat, lon, t=None)  Reuse a cached TimeCalc object.
-# astro.info(target, observer, pos_only=False, T=now)  Return a dictionary of info about the body's pos, rise/set, etc. in local time
-# astro.print_planets(observer, pos_only=False, T=Now) Print out an ephemeris, short or long
+# astro.get_TimeCalc(lat, lon, t=None)  Reuse a cached  TimeCalc object.
+# astro.info(target, observer, pos_only=False, T=now)   Return a dictionary of info about the body's pos, rise/set, etc. in local time
+# astro.print_planets(observer, pos_only=False, T=Now)  Print out an ephemeris, short or long
+# astro.haversine(lat1, lon1, lat2, lon2, metric=False) Calc didtance between points on earth's surface.
 # astro.risings_and_settings(ephemeris, target, topos, horizon, radius)  Calc rise/set for any body
 
 
 import math, calendar, TimeCalc
-from skyfield import api, almanac
-from skyfield.api import Star
-from skyfield.data import hipparcos
+from skyfield             import api, almanac
+from skyfield.api         import Star
+from skyfield.data        import hipparcos
 from skyfield.nutationlib import iau2000b
-from datetime import datetime, timezone, timedelta
+from datetime             import datetime, timezone, timedelta
+from math                 import radians, cos, sin, asin, sqrt
 
 
 LOAD_HIPPARCOS  = False  # TODO: Should be a function of cmd line param
+TIME_ZONE_DIST  = 1.0    # How many miles location much change to recalc timezone.
 data_dir        = '/usr/local/share/skyfield/data'
-
 _time_calc      = None  # Access through get_TimeCalc. Instance is cached. Use change_location freely.
+
+
+def haversine(lat1, lon1, lat2, lon2, metric=False):
+    """
+    Calculate the great circle distance between two points 
+    on the earth (specified in decimal degrees)
+    """
+    # convert decimal degrees to radians 
+    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+
+    # haversine formula 
+    dlon = lon2 - lon1 
+    dlat = lat2 - lat1 
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * asin(sqrt(a))
+    r = 6371 if metric else 3956 # radius of the Earth
+    return c * r
 
 
 # t is a skyfield Time object, lat and lon are degrees in floats
@@ -77,9 +96,16 @@ def get_TimeCalc(lat, lon, t=None):
         _time_calc = TimeCalc.TimeCalc(lat, lon, t.utc_datetime())
     else:
         # Don't change location unless needed. Timezone is cached.
-        # TODO: Should see if lat and lon are reasonably close.
-        if lat != _time_calc.lat or lon != _time_calc.lon:
+        # Check to see if distance is > 1 mile from current settings.
+        # change if greater, leave as is for less.
+        # TODO: distance should be a settings.  Need -force param.
+        # TODO: should this calc move to TimeCalc?
+        dist = haversine(lat, lon, _time_calc.lat, _time_calc.lon)
+        if TIME_ZONE_DIST < dist:
+            print('Changing TimeCalc loc because distance is %s' % dist)
             _time_calc.change_location(lat, lon)
+        else:
+            print('Keeping cached location because distance change is %s' % dist)
         _time_calc.change_time(t.utc_datetime())
     return _time_calc
 
