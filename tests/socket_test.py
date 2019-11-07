@@ -16,6 +16,7 @@ def testmsg(msg):
 #    testmsg(msg)
 #    time.sleep(1)
 
+testmsg('localtime')
 testmsg('gps')
 testmsg('time')
 testmsg('day')

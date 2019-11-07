@@ -190,11 +190,12 @@ def update_state():
 #    The socket server makes IPC with the system service possible.
 #    Short keyword messages are sent to the socket, and JSON strings are returned.
 #    Valid selectors:
-#        gps    Returns the state dictionary
-#        time   Returns the output from a TimeCalc (utc, lcoal, solar, sidereal, etc)
-#        day    Returns the shape-of-day for the current local day
+#        gps        Returns the state dictionary
+#        localtime  An iso date/time string, (NOT JSON)
+#        time       Returns the output from a TimeCalc (utc, lcoal, solar, sidereal, etc)
+#        day        Returns the shape-of-day for the current local day
 #        sun, moon, mercury, venus, mars, jupiter, saturn, uranus, neptune, pluto
-#           Returns name, alt, azm, and distance in miles
+#                   Returns name, alt, azm, and distance in miles
 #
 ################################################################################
 
@@ -203,6 +204,17 @@ def get_json():
     update_state()
     return json.dumps(state)
 
+
+# Unlike the others, get_localtime returns just a string, an iso datetime
+# This can easily be converted to a datetime in various languages
+# TODO: Should this be JSON or not?
+def get_localtime():
+    update_state()
+    tcalc = astro.get_TimeCalc(state['lat'], state['lon'])
+    dt    = tcalc.getLocalTime()
+    dt    += datetime.timedelta(microseconds=500000) # Round to nearest second
+    dt    -= datetime.timedelta(microseconds=dt.microsecond)
+    return str(dt)
 
 # Generate the shape-of-day info dictionary, convert to JSON and return.
 # Note: this is extremely expensive on the RPiZero.
@@ -274,7 +286,7 @@ def socket_server():
     logging.info('Socket now listening')
 
     #now keep talking with the client
-    while 1:
+    while True:
         #wait to accept a connection - blocking call
         conn, addr = sock.accept()
         data = conn.recv(16)
@@ -282,6 +294,8 @@ def socket_server():
         logging.info("Server received: '%s' from %s:%s" % (msg, addr[0], str(addr[1])))
         if 'gps' == msg:
             reply = get_json()
+        elif 'localtime' == msg:
+            reply = get_localtime()
         elif 'time' == msg:
             reply = get_time_info()
         elif 'day' == msg:
