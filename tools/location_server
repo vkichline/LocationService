@@ -1,0 +1,80 @@
+#!/usr/bin/env python
+
+import signal, socket
+from BaseHTTPServer import BaseHTTPRequestHandler,HTTPServer
+
+SERVER_PORT_NUMBER      = 8080
+SERVER_HOST             = ''
+LOC_SERVICE_PORT_NUMBER = 9999
+LOC_SERVICE_HOST        = '127.0.0.1'
+
+
+def get_data(id):
+    s = socket.socket()
+    s.connect((LOC_SERVICE_HOST, LOC_SERVICE_PORT_NUMBER))
+    s.sendall(id.encode())
+    data = s.recv(1024)
+    print('Received: %s' % (data))
+    return data.decode('utf-8')
+
+
+#This class will handles any incoming request from
+#the browser 
+class myHandler(BaseHTTPRequestHandler):
+	
+    #Handler for the GET requests
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type','application/json')
+        self.end_headers()
+        # Send the html message
+        print('%s request' % (self.path))
+        if '/gps' == self.path:
+            msg = get_data('gps')
+        elif '/time' == self.path:
+            msg = get_data('time')
+        elif '/day' == self.path:
+            msg = get_data('day')
+        elif '/sun' == self.path:
+            msg = get_data('sun')
+        elif '/moon' == self.path:
+            msg = get_data('moon')
+        elif '/mercury' == self.path:
+            msg = get_data('mercury')
+        elif '/venus' == self.path:
+            msg = get_data('venus')
+        elif '/mars' == self.path:
+            msg = get_data('mars')
+        elif '/jupiter' == self.path:
+            msg = get_data('jupiter')
+        elif '/saturn' == self.path:
+            msg = get_data('saturn')
+        elif '/uranus' == self.path:
+            msg = get_data('uranus')
+        elif '/neptune' == self.path:
+            msg = get_data('neptune')
+        elif '/pluto' == self.path:
+            msg = get_data('pluto')
+        self.wfile.write(msg)
+        return
+
+
+def signal_term_handler(signal, frame):
+    print('got SIGTERM')
+    sys.exit(0)
+
+
+signal.signal(signal.SIGTERM, signal_term_handler)
+
+try:
+	#Create a web server and define the handler to manage the
+	#incoming request
+	server = HTTPServer((SERVER_HOST, SERVER_PORT_NUMBER), myHandler)
+	print('Started httpserver on port %s' % (SERVER_PORT_NUMBER))
+	
+	#Wait forever for incoming htto requests
+	server.serve_forever()
+
+except KeyboardInterrupt:
+	print('^C received, shutting down the web server')
+	server.socket.close()
