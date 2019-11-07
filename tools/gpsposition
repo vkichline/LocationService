@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+
+# Call the location_server and get the current GPS data.
+# Return a dictionary
+
+import socket, json
+
+LOC_SERVICE_PORT_NUMBER = 9999
+LOC_SERVICE_HOST        = '127.0.0.1'
+
+
+def get():
+    s = socket.socket()
+    s.connect((LOC_SERVICE_HOST, LOC_SERVICE_PORT_NUMBER))
+    s.sendall(b'gps')
+    data = s.recv(1024)
+    #print('Received: %s' % (data))
+    data = data.decode('utf-8')
+    return json.loads(data)
+
+def print_prop(name):
+    print('%s:\t%s' % (name, loc[name]))
+
+if __name__ == '__main__':
+    loc = get()
+    print_prop('mode')
+    print_prop('time')
+    print_prop('lat')
+    print_prop('lon')
+    print_prop('alt')
+    print_prop('speed')
+    print_prop('climb')
