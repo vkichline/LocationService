@@ -43,6 +43,7 @@
 # astro.day_start(t, observer)   Time object for the first moment of the day of the time provided
 # astro.day_noon(t, observer)    Time object for noon of of the time provided
 # astro.day_end(t, observer)     Time object for the last moment of of the time provided
+# astro.whats_up(observer, t)    Returns a JSON string describing all visible objects at t for observer
 # astro.topo_from_data(lat, lon, alt) Get a Topo object set to the current GPS location
 # astro.loc_from_data(lat, lon, alt)  Get a Location object set to the current GPS location on the surface of the Earth
 # astro.name_from_body(body)          Given one of the planet objects above, return its name
@@ -56,7 +57,7 @@
 # astro.risings_and_settings(ephemeris, target, topos, horizon, radius)  Calc rise/set for any body
 
 
-import math, logging, calendar, TimeCalc
+import math, logging, json, calendar, TimeCalc
 from skyfield             import api, almanac
 from skyfield.api         import Star
 from skyfield.data        import hipparcos
@@ -314,6 +315,20 @@ def print_planets(observer, pos_only=False, t=None):
     print_header(pos_only)
     for body in [sun, moon, mercury, venus, mars, jupiter, saturn, uranus, neptune, pluto]:
         print_body(body, pos_only)
+
+
+# Make a sorted list of objects that are above the horizon at a given time and location.
+# Return a JSON string describing each visible body.
+def whats_up(observer, t=None):
+    if t is None:
+        t   = now()
+    visible = {}
+    for body in [sun, moon, mercury, venus, mars, jupiter, saturn]:
+        name, alt, azm, dist, illum = info(body, observer, True, t)
+        illum = 100.0 if illum is None else round(illum, 2)
+        if alt > 0:
+            visible[name] = {'alt': alt, 'azm': azm, 'dist': dist, 'illum': illum}
+    return json.dumps(visible)
 
 
 def now():

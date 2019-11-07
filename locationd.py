@@ -205,16 +205,24 @@ def get_json():
     return json.dumps(state)
 
 
+# Return a nested JSON string describing all the naked-eye visible bodies
+def get_whatsup():
+    update_state()
+    observer = astro.loc_from_data(state['lat'], state['lon'], state['alt'])
+    return astro.whats_up(observer)
+
+
 # Unlike the others, get_localtime returns just a string, an iso datetime
 # This can easily be converted to a datetime in various languages
 # TODO: Should this be JSON or not?
-def get_localtime():
+def get_localtime_string():
     update_state()
     tcalc = astro.get_TimeCalc(state['lat'], state['lon'])
     dt    = tcalc.getLocalTime()
     dt    += datetime.timedelta(microseconds=500000) # Round to nearest second
     dt    -= datetime.timedelta(microseconds=dt.microsecond)
     return str(dt)
+
 
 # Generate the shape-of-day info dictionary, convert to JSON and return.
 # Note: this is extremely expensive on the RPiZero.
@@ -295,13 +303,15 @@ def socket_server():
         if 'gps' == msg:
             reply = get_json()
         elif 'localtime' == msg:
-            reply = get_localtime()
+            reply = get_localtime_string()
         elif 'time' == msg:
             reply = get_time_info()
         elif 'day' == msg:
             reply = get_day_info()
         elif msg in ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto']:
             reply = get_almanac(msg)
+        elif 'whatsup' == msg:
+            reply = get_whatsup()
         else:
             logging.warning('Unexpected selector in socket msg: %s' % (msg))
             reply = '{"error":"' + msg + '"}'
