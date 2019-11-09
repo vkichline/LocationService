@@ -197,17 +197,12 @@ def calculate_all(t):
 
 
 if '__main__' == __name__:
-    y = 2019
-    m = 10
-    d = 17
-    h = 12
-    m = 0
-    s = 0
     x = DAYS_TO_CALC   # How many days to calculate
-
+    dt = a.now().utc_datetime()
     conj_count = 0
-    for i in range(0, x):
-        t = a.ts.utc(y, m, d+i, h, m, s)
-        conj_count += calculate_all(t)
+    for d in range(x):
+        for h in range(24):
+            t = a.ts.utc(dt.year, dt.month, dt.day+d, dt.hour+h, 0, 0)
+            conj_count += calculate_all(t)
     if 0 < conj_count:
         print('Total conjunctions:   {0}'.format(conj_count))
