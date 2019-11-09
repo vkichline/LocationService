@@ -1,0 +1,2 @@
+du -h /var/log/gps
+du -h /usr/local/share/skyfield/data

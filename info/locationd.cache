@@ -4,7 +4,7 @@
     "time": "2019-11-07T00:32:57.001Z",
     "lat": 47.725323987,
     "alt": 110.121,
-    "speed": 0.224,
-    "climb": 0.54,
+    "speed": 0.0,
+    "climb": 0.0,
     "persistance_version": 4
 }
