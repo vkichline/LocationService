@@ -1,25 +1,23 @@
 #!/usr/bin/env python3
 
-################################################################################
-#
-#    Service to accumulate gps and imu data from BerryGPS/IMU and make it easily available
-#    Service control file for user service at /usr/lib/systemd/user/locationd.service
-#    NOTE: changed from user to system service and moved control file to /etc/systemd/system/locationd.service
-#    Article on develping Python services: https://github.com/torfsen/python-systemd-tutorial
-#    Additional functionality:
-#        When GPS state transitions to 2 or 3 and system time has not been set since service started:
-#            Check to see if system time is more than 5 seconds different than GPS time.
-#            If time differs, et system time
-#    Van Kichline, September 2019
-#    October:
-#        Adding planetary almanac, initially for Sun and Moon
-#        Functionality is astro.py module
-#
-#    Names of the GpsState properties:
-#        mode(int), time(str), lat(float deg), lon(float deg), alt(int M), speed(float M/s), climb(float deg)
-#        persistance_version is added when writing to cache
-#
-################################################################################
+"""
+   Service to accumulate gps and imu data from BerryGPS/IMU and make it easily available
+   Service control file for user service at /usr/lib/systemd/user/locationd.service
+   NOTE: changed from user to system service and moved control file to /etc/systemd/system/locationd.service
+   Article on develping Python services: https://github.com/torfsen/python-systemd-tutorial
+   Additional functionality:
+     When GPS state transitions to 2 or 3 and system time has not been set since service started:
+       Check to see if system time is more than 5 seconds different than GPS time.
+       If time differs, et system time
+  Van Kichline, September 2019
+  October:
+     Adding planetary almanac, initially for Sun and Moon
+     Functionality is astro.py module
+
+   Names of the GpsState properties:
+     mode(int), time(str), lat(float deg), lon(float deg), alt(int M), speed(float M/s), climb(float deg)
+     persistance_version is added when writing to cache
+"""
 
 # Load the settings dictionary and access settings as: cfg.get['KEY']
 import configuration as cfg
@@ -36,22 +34,29 @@ MAX_TIME_DIFFERENCE = cfg.locationd['MAX_TIME_DIFFERENCE']
 ALMANAC_ROUNDING    = cfg.locationd['ALMANAC_ROUNDING']
 
 
-################################################################################
-#
-#    This class runs a thread that acquires the latest data from gpsd.
-#    To begin acuiring data, run:
-#        gpsp = GpsPoller()
-#        gpsp.start()
-#    To acquire the dictionary of current TVP values, call:
-#        gpsp.value()
-#    To shut down the poller, call:
-#        gpsd.join()
-#
-################################################################################
+"""
+This class runs a thread that acquires the latest data from gpsd.
+To begin acuiring data, run:
+  gpsp = GpsPoller()
+  gpsp.start()
+To acquire the dictionary of current TVP values, call:
+  gpsp.value()
+To shut down the poller, call:
+  gpsd.join()
+"""
 
 import gps
 class GpsPoller(threading.Thread):
-
+    """
+    This class runs a thread that acquires the latest data from gpsd.
+    To begin acuiring data, run:
+        gpsp = GpsPoller()
+        gpsp.start()
+    To acquire the dictionary of current TVP values, call:
+        gpsp.value()
+    To shut down the poller, call:
+        gpsd.join()
+    """
     def __init__(self):
         self._stopevent    = threading.Event() # Used to shut down the poller
         self.current_value = {}
