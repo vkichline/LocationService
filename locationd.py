@@ -23,7 +23,7 @@
 
 # Load the settings dictionary and access settings as: cfg.get['KEY']
 import configuration as cfg
-import time, signal, threading, json, datetime, os, socket, sys, math, logging, astro, DayCalc, traceback
+import time, signal, threading, json, datetime, os, socket, sys, math, logging, astro, DayCalc, traceback, geomag
 
 logging.basicConfig(format='%(levelname)s:%(message)s', level=cfg.locationd['LOGGING_LEVEL'])
 logging.info('Configuration file loaded. Logging level: %s', cfg.locationd['LOGGING_LEVEL'])
@@ -199,10 +199,21 @@ def update_state():
 #
 ################################################################################
 
+# Return a float represeting the magnetic declination
+def get_mag_decl():
+    update_state()
+    return geomag.declination(dlat=state['lat'], dlon=state['lon'],h=state['alt'])
+
+
 # Return a JSON string representing the current state:
 def get_json():
     update_state()
-    return json.dumps(state)
+    # Add magnetic declination to state values before transmitting
+    state_prime = state.copy()
+    magdec = get_mag_decl()
+    magdec = round(magdec,  ALMANAC_ROUNDING)
+    state_prime['magdec'] = str(magdec)
+    return json.dumps(state_prime)
 
 
 # Return a nested JSON string describing all the naked-eye visible bodies
@@ -214,7 +225,6 @@ def get_whatsup():
 
 # Unlike the others, get_localtime returns just a string, an iso datetime
 # This can easily be converted to a datetime in various languages
-# TODO: Should this be JSON or not?
 def get_localtime_string():
     update_state()
     tcalc = astro.get_TimeCalc(state['lat'], state['lon'])

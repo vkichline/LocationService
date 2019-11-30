@@ -30,3 +30,4 @@ if __name__ == '__main__':
     print_prop('alt')
     print_prop('speed')
     print_prop('climb')
+    print_prop('magdec')
