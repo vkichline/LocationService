@@ -1,0 +1,19 @@
+sudo apt install gpsd gpsd-clients
+
+sudo pip3 install gps
+sudo pip3 install skyfield
+sudo pip3 install timezonefinder
+sudo pip3 install pytz
+sudo pip3 install geomag
+
+in LocationService directory, run: sudo ./deploy
+systemctl --user enable locationd
+
+Add these to /etc/rc.local before the exit 0:
+/home/van/Web/gps_server >> /tmp/gps_server.log 2>&1 &
+/home/van/Web/location_server >> /tmp/location_server.log 2>&1 &
+
+Save gps data to log file:
+sudo mkdir /var/log/gps
+Add to /etc/rc.local before the exit 0:
+gpspipe -r -d -l -o /var/log/gps/data.`date +"%Y%m%d%h%m%s"`.nmea &
