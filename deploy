@@ -5,6 +5,7 @@ sudo systemctl stop locationd
 
 # create directory if needed
 sudo mkdir -p                  /usr/local/lib/locationd
+sudo mkdir -p                  /var/cache/locationd
 
 echo Preserving/deploying locationd.cache
 cp /var/cache/locationd/locationd.cache info/locationd.cache
