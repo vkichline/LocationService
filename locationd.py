@@ -240,13 +240,18 @@ def get_localtime_string():
 
 
 # Note: get_sidereal_string returns just a string, and iso datetime
+# getLMST returns a float, 0.0 - 24.0
 def get_sidereal_string():
     update_state()
-    tcalc = astro.get_TimeCalc(state['lat'], state['lon'])
-    dt    = tcalc.getLMST()
-    dt    += datetime.timedelta(microseconds=500000) # Round to nearest second
-    dt    -= datetime.timedelta(microseconds=dt.microsecond)
-    return str(dt)
+    tcalc  = astro.get_TimeCalc(state['lat'], state['lon'])
+    lmst   = tcalc.getLMST()
+    h      = int(lmst)
+    lmst   = (lmst - h) * 60
+    m      = int(lmst)
+    lmst   = (lmst - m) * 60
+    s      = int(lmst)
+    t      = datetime.time(h, m, s)
+    return str(t)
 
 # Generate the shape-of-day info dictionary, convert to JSON and return.
 # Note: this is extremely expensive on the RPiZero.
