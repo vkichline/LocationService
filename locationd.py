@@ -228,7 +228,7 @@ def get_whatsup():
     return astro.whats_up(observer)
 
 
-# Unlike the others, get_localtime returns just a string, an iso datetime
+# Note: get_localtime returns just a string, an iso datetime
 # This can easily be converted to a datetime in various languages
 def get_localtime_string():
     update_state()
@@ -238,6 +238,15 @@ def get_localtime_string():
     dt    -= datetime.timedelta(microseconds=dt.microsecond)
     return str(dt)
 
+
+# Note: get_sidereal_string returns just a string, and iso datetime
+def get_sidereal_string():
+    update_state()
+    tcalc = astro.get_TimeCalc(state['lat'], state['lon'])
+    dt    = tcalc.getLMST()
+    dt    += datetime.timedelta(microseconds=500000) # Round to nearest second
+    dt    -= datetime.timedelta(microseconds=dt.microsecond)
+    return str(dt)
 
 # Generate the shape-of-day info dictionary, convert to JSON and return.
 # Note: this is extremely expensive on the RPiZero.
@@ -319,6 +328,8 @@ def socket_server():
             reply = get_json()
         elif 'localtime' == msg:
             reply = get_localtime_string()
+        elif 'sidereal' == msg:
+            reply = get_sidereal_string()
         elif 'time' == msg:
             reply = get_time_info()
         elif 'day' == msg:
