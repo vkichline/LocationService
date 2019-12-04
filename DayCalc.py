@@ -127,6 +127,17 @@ class DayCalc:
                 rise_time = a.time_to_local_datetime(ti, self.loc)
             else:
                 set_time  = a.time_to_local_datetime(ti, self.loc)
+        # Because of the moon's apparent motion, there are some times it may not rise or set in a given
+        if body == a.moon and not rise_time:
+            t0    = a.ts.utc(self.DATE.year, self.DATE.month, self.DATE.day, + self.offset - 2, 0, 0)
+            t, y  = a.almanac.find_discrete(t0, t1, a.risings_and_settings(a.planets, a.moon, self.loc, radius=0.5))
+            t = t[0] if y[0] else t[1]
+            rise_time = a.time_to_local_datetime(t, self.loc)
+        elif body == a.moon and not set_time:
+            t1    = a.ts.utc(self.DATE.year, self.DATE.month, self.DATE.day, 23 + self.offset + 2, 59, 59)
+            t, y  = a.almanac.find_discrete(t0, t1, a.risings_and_settings(a.planets, a.moon, self.loc, radius=0.5))
+            t = t[0] if y[1] else t[1]
+            set_time = a.time_to_local_datetime(t, self.loc)
         return rise_time, set_time
 
     def calc_all(self):
