@@ -297,6 +297,8 @@ def get_almanac(body_name):
     result['dist'] = round(dist, ALMANAC_ROUNDING)
     if illum is not None:
         result['illum'] = round(illum, ALMANAC_ROUNDING)
+    if 'moon' == body_name:
+        result['phase'] = astro.moon_phase()
     strResult = json.dumps(result)
     logging.debug('Result: %s', strResult)
     return strResult

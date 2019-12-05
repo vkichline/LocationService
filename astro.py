@@ -62,6 +62,7 @@ from skyfield             import api, almanac
 from skyfield.api         import Star
 from skyfield.data        import hipparcos
 from skyfield.nutationlib import iau2000b
+from skyfield.constants   import tau
 from datetime             import datetime, timezone, timedelta
 from math                 import radians, cos, sin, asin, sqrt
 
@@ -69,6 +70,7 @@ from math                 import radians, cos, sin, asin, sqrt
 LOAD_HIPPARCOS  = False
 TIME_ZONE_DIST  = 1.0    # How many miles location much change to recalc timezone.
 LOG_LEVEL       = logging.INFO
+ROUNDING        = 3
 
 data_dir        = '/usr/local/share/skyfield/data'
 _time_calc      = None  # Access through get_TimeCalc. Instance is cached. Use change_location freely.
@@ -207,6 +209,18 @@ def time_to_local_datetime(t, observer):
     return tc.getLocalTime()
 
 
+def moon_phase(t=None):
+    """Return the phase of the moon  at time `t`. 0 = New, 25 = Fisrt Quarter, 50 = Full, etc."""
+    if t is None: t = now()
+    t._nutation_angles = iau2000b(t.tt)
+    e = earth.at(t)
+    _, mlon, _ = e.observe(moon).apparent().ecliptic_latlon('date')
+    _, slon, _ = e.observe(sun).apparent().ecliptic_latlon('date')
+    # phase = ((mlon.radians - slon.radians) // (tau / 8) % 8).astype(int)
+    phase = ((mlon.radians - slon.radians) / (tau / 100) % 100)
+    return round(phase, ROUNDING)
+
+
 # Observe a target body from an observer body or Topo and return info.
 # If pos_only is omitted or False, return:
 # name, alt, azm, dist, rising, culmination, setting, culmatl, illum, const for a target body
@@ -221,7 +235,6 @@ def time_to_local_datetime(t, observer):
 # If t is a skyfield Time object, use that for calcuation. If t is None, use now()/
 #
 def info(target, observer, pos_only=False, t=None):
-    ROUNDING = 3
     if t is None:    t = now()
     name           = name_from_body(target)
     astrometric    = observer.at(t).observe(target)
